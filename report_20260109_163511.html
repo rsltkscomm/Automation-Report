@@ -1,0 +1,426 @@
+	            <!DOCTYPE html>
+	            <html lang="en">
+	            <head>
+	            <meta charset="utf-8"/>
+	            <title>Automation Test Summary Report</title>
+	            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+	            <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+	            <style>
+	            body { font-family: 'Segoe UI', sans-serif; background:#f8f9fb; margin:0; color:#333; }
+	            .header { display:flex; justify-content:space-between; align-items:center; background:linear-gradient(90deg,#002b6b,#0052cc); color:white; padding:10px 20px; }
+	            .header img { height:40px; }
+	            .summary-band { background:#0052cc; color:white; display:flex; justify-content:center; gap:30px; padding:8px; font-weight:600; }
+	            .summary-band div { display:flex; align-items:center; gap:5px; }
+	            .main { display:flex; gap:20px; padding:20px; }
+	            .chart-container { flex:1; display:flex; justify-content:center; align-items:center; }
+	            .table-container { flex:1; background:white; padding:15px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.1); }
+	            .table-container table { width:100%; border-collapse:collapse; }
+	            .table-container th, .table-container td { padding:8px; border-bottom:1px solid #eee; text-align:left; }
+	            .table-container th { background:#002b6b; color:white; }
+	            .footer { text-align:center; font-size:0.8em; padding:10px; background:#f1f1f1; margin-top:20px; }
+
+	            /* Detailed Report Styles */
+	            .detailed-section { display: none; }
+	            #smartui-section { display: none; }
+	            /* Ensure performance section is hidden by default so refresh always starts on summary */
+	            #performance-section { display: none; }
+
+	            .step-table { width:90%; margin:10px auto; border-collapse:collapse; font-size:0.85em; }
+	            .step-table th, .step-table td { border:1px solid #ccc; padding:5px; text-align:left; }
+	            .step-table th { background:#f1f1f1; color:black; }
+	            .screenshot { width:100px; cursor:pointer; }
+	            .details { display:none; }
+	            .environment-ribbon { background:#f4f6f8; padding:10px; font-size:0.9em; border-bottom:1px solid #ddd; display:flex; justify-content:space-around; }
+	            .toolbar input, .toolbar select, .toolbar button { padding:6px 10px; border-radius:5px; border:1px solid #ccc; }
+	            .toolbar button { background:#007bff; color:white; border:none; cursor:pointer; }
+	            .toolbar button:hover { background:#0056b3; }
+
+	            /* Modal Styles */
+	            .modal {
+	              display: none;
+	              position: fixed;
+	              z-index: 9999;
+	              padding-top: 60px;
+	              left: 0;
+	              top: 0;
+	              width: 100%;
+	              height: 100%;
+	              overflow: auto;
+	              background-color: rgba(0,0,0,0.9);
+	            }
+	            .modal-content {
+	              display: block;
+	              margin: auto;
+	              max-width: 80%;
+	              max-height: 80%;
+	            }
+	            #closeModal {
+	              position: absolute;
+	              top: 20px;
+	              right: 35px;
+	              color: #fff;
+	              font-size: 30px;
+	              font-weight: bold;
+	              cursor: pointer;
+	            }
+
+	            table tr[onclick]:hover {
+	              background-color: #f0f8ff !important;
+	              transition: background-color 0.3s ease;
+	            }
+
+	            .chart-container canvas {
+	              max-width: 300px !important;
+	              max-height: 300px !important;
+	            }
+
+	            .detailed-report-link {
+	                text-align:right;
+	                padding:10px;
+	                display: block;
+	            }
+	            .detailed-report-link a {
+	                color: #0052cc;
+	                text-decoration: none;
+	                font-weight: 600;
+	                cursor: pointer;
+	                padding-right: 47px;
+	            }
+	            .detailed-report-link a:hover {
+	                text-decoration: underline;
+	            }
+
+	            .smartui-report-link {
+	                text-align:right;
+	                padding-right:10px;
+	                padding-top:4px;
+	                display: block;
+	            }
+	            .smartui-report-link a {
+	                color: #0052cc;
+	                text-decoration: none;
+	                font-weight: 600;
+	                cursor: pointer;
+	            }
+	            .smartui-report-link a:hover {
+	                text-decoration: underline;
+	            }
+
+	            .performance-report-link {
+	                text-align:right;
+	                padding-top:12px;
+	                padding-right:23px;
+	                display: none;
+	            }
+	            .performance-report-link a {
+	                color: #0052cc;
+	                text-decoration: none;
+	                font-weight: 600;
+	                cursor: pointer;
+	            }
+	            .performance-report-link a:hover {
+	                text-decoration: underline;
+	            }
+
+	            .back-btn {
+	                background: white;
+	                color: blue;
+	                padding: 8px 15px;
+	                border-radius: 5px;
+	                text-decoration: none;
+	                box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+	                display:inline-block;
+	                margin:20px 0;
+	                cursor: pointer;
+	            }
+
+	            .status-pass { color: #28a745; font-weight: bold; }
+	            .status-fail { color: #dc3545; font-weight: bold; }
+	            .status-skipped { color: #ffc107; font-weight: bold; }
+
+	            /* Iframes to isolate embedded reports */
+	            .embedded-report-frame {
+	                width: 100%;
+	                border: 0;
+	                display: block;
+	                min-height: 600px; /* fallback height */
+	            }
+
+	            .sla-pass {
+  color: #28a745;
+  font-weight: bold;
+}
+
+.sla-fail {
+  color: #dc3545;
+  font-weight: bold;
+}
+
+	            </style>
+	            </head>
+	            <body>
+	            <!-- Summary Report Section -->
+	            <div id="summary-section">
+	                <div class="header">
+	                <img alt="Company Logo" src="https://www.resulticks.com/images/logos/resulticks-logo-blue.svg"/>
+	                <h2>Test Summary Report</h2>
+	                <img alt="Product Logo" src="https://run19.resul.io/assets/resulticks-logo-white-391eec89.svg"/>
+	                </div>
+	                <div class="summary-band">
+	                <div>✅ Passed: 0</div>
+	                <div>❌ Failed: 0</div>
+	                <div>⚠️ Skipped: 0</div>
+	                <div>📊 Total: 0</div>
+	                <div>⏱️ Duration: -</div>
+	                <div>🎯 Pass Rate: 0%</div>
+	                <div>🎯 SLA: 90%</div>
+	                </div>
+	                <div class="detailed-report-link">
+	                <a onclick="showDetailedReport()">📑 Detailed Report</a>
+	                </div>
+	                <div class='smartui-report-link'><a onclick='smartuiReport()'>📑 UI Comparison Report</a></div>
+	                
+	                <div class="main">
+	                <div class="chart-container">
+	                    <canvas id="chart1"></canvas>
+	                </div>
+	                <div class="table-container">
+	                <h3>Module-wise Results</h3>
+	                <table>
+	                <tr><th>Module</th><th>Total</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Duration</th><th>SLA %</th><th>Pass %</th></tr>
+	                <tbody id="moduleTableBody"></tbody>
+	                </table>
+	                </div>
+	                </div>
+	                <div class="footer">Report generated on <span id="current-datetime">09-Jan-2026 16:19:08</span> | Contact: <a href="mailto:qaautomation@resulticks.com">qaautomation@resulticks.com</a></div>
+	            </div>
+
+	            <!-- Detailed Report Section -->
+	            <div id="detailed-section" class="detailed-section">
+	                <div class="header"><img alt="Company Logo" src="https://www.resulticks.com/images/logos/resulticks-logo-blue.svg"/><h2>Detail Test Report</h2><img alt="Product Logo" src="https://run19.resul.io/assets/resulticks-logo-white-391eec89.svg"/></div><div class="environment-ribbon"><span><strong>Environment:</strong> team</span><span><strong>Browser:</strong> chrome</span><span><strong>Release:</strong> 5.0</span><span><strong>Execution Date:</strong> 2026-01-09 16:24:42</span></div><div style="text-align:right; padding:10px;"><a class="back-btn" onclick="showSummaryReport()">⬅ Back to Summary Report</a></div><div class="table-container"><h3>Test Case Results</h3><div class="toolbar"><div style="display:flex; gap:15px; flex-wrap:wrap; margin:20px 0;"><div><label><b>Search:</b></label><input id="searchInput" placeholder="Search test cases..." type="text"/></div><div><label><b>Filter by Status:</b></label><select id="statusFilter"><option value="">All</option><option value="PASS">Passed</option><option value="FAIL">Failed</option><option value="SKIPPED">Skipped</option></select></div></div></div><table id="testcaseTable"><thead><tr><th></th><th>Module</th><th>Test Case ID</th><th>Description</th><th>Status</th><th>Duration</th></tr></thead><tbody></tbody></table></div><script>
+function toggleDetails(row) {
+  if (!row) return;
+  var testId = row.getAttribute('data-test-id');
+  var detailsRow = document.getElementById(testId + '-details');
+  if (!detailsRow) return;
+  var expanded = row.getAttribute('data-expanded') === 'true';
+  var expandIcon = row.querySelector('.expand-icon');
+  if (expanded) {
+    detailsRow.style.display = 'none';
+    row.setAttribute('data-expanded', 'false');
+    if (expandIcon) expandIcon.textContent = '+';
+  } else {
+    detailsRow.style.display = 'table-row';
+    row.setAttribute('data-expanded', 'true');
+    if (expandIcon) expandIcon.textContent = '-';
+  }
+}
+function applySearchAndFilter() {
+  var searchText = document.getElementById('searchInput').value.toLowerCase().trim();
+  var filterValue = document.getElementById('statusFilter').value;
+  var mainRows = document.querySelectorAll('#testcaseTable tbody tr:not(.details-row)');
+  mainRows.forEach(function(row) {
+    var rowText = row.textContent.toLowerCase();
+    var statusText = row.cells[4] ? row.cells[4].textContent.toLowerCase() : '';
+    var rowStatus = statusText.includes('pass') ? 'PASS' : statusText.includes('fail') ? 'FAIL' : statusText.includes('skip') ? 'SKIPPED' : '';
+    var matchesSearch = !searchText || rowText.includes(searchText);
+    var matchesFilter = !filterValue || rowStatus === filterValue;
+    var shouldShow = matchesSearch && matchesFilter;
+    var testId = row.getAttribute('data-test-id');
+    var detailsRow = document.getElementById(testId + '-details');
+    if (shouldShow) {
+      row.style.display = '';
+      if (detailsRow) {
+        var expanded = row.getAttribute('data-expanded') === 'true';
+        detailsRow.style.display = expanded ? 'table-row' : 'none';
+      }
+    } else {
+      row.style.display = 'none';
+      if (detailsRow) detailsRow.style.display = 'none';
+      if (row.querySelector('.expand-icon')) {
+        row.querySelector('.expand-icon').textContent = '+';
+        row.setAttribute('data-expanded', 'false');
+      }
+    }
+  });
+}
+document.addEventListener('DOMContentLoaded', function() {
+  var searchInput = document.getElementById('searchInput');
+  var statusFilter = document.getElementById('statusFilter');
+  if (searchInput) searchInput.addEventListener('input', applySearchAndFilter);
+  if (statusFilter) statusFilter.addEventListener('change', applySearchAndFilter);
+});
+</script>
+
+	            </div>
+
+	            <!-- SmartUI report isolated in iframe -->
+	            <div id="smartui-section" class="smartui-section">
+	                <iframe id="smartui-frame" class="embedded-report-frame"></iframe>
+	            </div>
+
+	            <!-- Performance report isolated in iframe -->
+	            <div id="performance-section" class="performance-section">
+	                <iframe id="performance-frame" class="embedded-report-frame"></iframe>
+	            </div>
+
+	            <!-- Lightbox Modal -->
+	            <div class="modal" id="lightboxModal">
+	                <span id="closeModal">✖</span>
+	                <img class="modal-content" id="lightboxImage"/>
+	            </div>
+
+	            <script>
+	            // Navigation functions
+	            function showDetailedReport() {
+	                document.getElementById("summary-section").style.display = "none";
+	                document.getElementById("detailed-section").style.display = "block";
+	                document.getElementById("smartui-section").style.display = "none";
+	                document.getElementById("performance-section").style.display = "none";
+	                window.scrollTo(0,0);
+	            }
+
+	            function smartuiReport() {
+	                document.getElementById("summary-section").style.display = "none";
+	                document.getElementById("detailed-section").style.display = "none";
+	                document.getElementById("smartui-section").style.display = "block";
+	                document.getElementById("performance-section").style.display = "none";
+	                window.scrollTo(0,0);
+	            }
+
+	            function performanceReport() {
+	                document.getElementById("summary-section").style.display = "none";
+	                document.getElementById("detailed-section").style.display = "none";
+	                document.getElementById("smartui-section").style.display = "none";
+	                document.getElementById("performance-section").style.display = "block";
+	                window.scrollTo(0,0);
+	            }
+
+	            function showSummaryReport() {
+	                document.getElementById("detailed-section").style.display = "none";
+	                document.getElementById("summary-section").style.display = "block";
+	                document.getElementById("smartui-section").style.display = "none";
+	                document.getElementById("performance-section").style.display = "none";
+	                window.scrollTo(0,0);
+	            }
+
+	            // Ensure we always start on summary after a hard refresh
+	            (function ensureStartOnSummary(){
+	                document.addEventListener('DOMContentLoaded', function(){
+	                    showSummaryReport();
+	                });
+	            })();
+
+	            // Utility: sanitize IDs consistently
+	            const sanitizeId = s => String(s ?? '')
+	              .toLowerCase()
+	              .replace(/\s+/g, '-')
+	              .replace(/[^a-z0-9\-_:.]/g, '');
+
+	            // Initialize main chart
+	            new Chart(document.getElementById('chart1'), {
+	              type: 'doughnut',
+	              data: { labels:['Passed','Failed','Skipped'], datasets:[{ data:[0,0,0], backgroundColor:['#28a745','#dc3545','#ffc107']}] },
+	              options: { plugins:{ legend:{ position:'bottom'} } }
+	            });
+
+	            // Safer JSON injection/parsing for module data
+	            const moduleDataRaw = `[]`;
+	            let moduleData = [];
+	            try { moduleData = JSON.parse(moduleDataRaw); } catch (e) { moduleData = []; }
+
+	            function formatDuration(ms) {
+	                if (!ms || ms <= 0) return '-';
+	                const totalSeconds = Math.floor(ms / 1000);
+	                const hours = Math.floor(totalSeconds / 3600);
+	                const minutes = Math.floor((totalSeconds % 3600) / 60);
+	                const seconds = totalSeconds % 60;
+	                const pad = (n) => n.toString().padStart(2, '0');
+	                return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+	            }
+
+	            function populateModuleTable() {
+	                const tableBody = document.getElementById('moduleTableBody');
+	                if (!moduleData || !Array.isArray(moduleData) || moduleData.length === 0) {
+	                    tableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #666;">No module data available</td></tr>';
+	                    return;
+	                }
+
+	                tableBody.innerHTML = moduleData.map(m => {
+	                    const successRate = m.total > 0 ? ((m.passed/m.total)*100).toFixed(0) : '0';
+	                    const slaRate = 90; // TODO: compute real SLA if different
+	                    const moduleName = m.module || 'Unknown Module';
+	                    const anchorId = 'module-' + sanitizeId(moduleName);
+
+	                    return `<tr onclick="showDetailedReport(); setTimeout(() => { const el = document.getElementById('${anchorId}'); if (el) el.scrollIntoView({behavior:'smooth'}); }, 100);" style="cursor:pointer;">
+	                        <td>${moduleName}</td>
+	                        <td>${m.total || 0}</td>
+	                        <td>${m.passed || 0}</td>
+	                        <td>${m.failed || 0}</td>
+	                        <td>${m.skipped || 0}</td>
+	                        <td>${formatDuration(m.durationMillis || 0)}</td>
+	                        <td class="${slaRate >= 90 ? 'sla-pass' : 'sla-fail'}">${slaRate}%</td>
+	                        <td class="${successRate >= slaRate ? 'sla-pass' : 'sla-fail'}">${successRate}%</td>
+                            </td>
+	                    </tr>`;
+	                }).join('');
+	            }
+
+	            // ===== Embed external reports in sandboxed iframes so their original CSS is preserved =====
+	            const HAS_SMARTUI = true;
+	            const HAS_PERFORMANCE = false;
+
+	            // Raw HTML strings (with back link injected on the Java side)
+	            const SMARTUI_HTML = `<!doctype html><html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SmartUI Visual Report - AUDIENCE - ADD AUDIENCE SCENARIOS</title>
+<style>
+body{font-family:Segoe UI,Arial,sans-serif;margin:0;background:#f6f7fb;color:#222;}
+header{background:#1e293b;color:#fff;padding:16px 24px;}
+.meta{font-size:12px;opacity:.85} .container{padding:16px 24px;}
+.card{background:#fff;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.08);margin:14px 0;padding:16px;}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;}
+.tag{display:inline-block;border-radius:999px;padding:4px 10px;font-size:12px;margin-right:6px;}
+.pass{background:#e6ffed;color:#036b26;border:1px solid #9ae6b4;}
+.fail{background:#ffe6e6;color:#9b1c1c;border:1px solid #feb2b2;}
+.imgs{display:flex;gap:10px;flex-wrap:wrap;} .imgs img{max-width:100%;border-radius:6px;border:1px solid #e2e8f0;}
+.title{font-weight:600;margin:0 0 6px 0;} .small{font-size:12px;color:#475569;}
+.pill{font-size:12px;background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;border-radius:999px;padding:3px 8px;margin-right:6px;}
+details summary{cursor:pointer;font-weight:600;margin:8px 0;}
+footer{font-size:12px;color:#475569;padding:12px 24px;}
+</style></head><body>
+<header><h2 style="margin:0">SmartUI Visual Report</h2><div class="meta">Suite: AUDIENCE - ADD AUDIENCE SCENARIOS • Generated: 2026-01-09_16-24-40</div></header><div style='text-align:right; padding:10px;'><a class='back-btn' href='#' onclick='if (window.parent && typeof window.parent.showSummaryReport === "function") { window.parent.showSummaryReport(); } return false;' style='display:inline-block;background:#ffffff;color:#0066cc;padding:8px 14px;border-radius:6px;text-decoration:none;box-shadow:0 2px 10px rgba(0,0,0,0.2);cursor:pointer;font-size:14px !important;line-height:1 !important;'><span style="font-size:14px !important; vertical-align:middle;">⬅</span><span style="margin-left:6px; vertical-align:middle; font-weight:600;">Back to Summary Report</span></a></div>
+<div class=container>
+<div class=card><span class="tag pass">Passed: 0</span><span class="tag fail">Failed: 0</span><span class="pill">Total: 0</span></div>
+</div><footer>SmartUI Custom Report • © 2026</footer></body></html>`;
+	            const PERFORMANCE_HTML = ``;
+
+	            function setIframeHtml(iframeId, html) {
+	                const frame = document.getElementById(iframeId);
+	                if (!frame) return;
+	                function resize() {
+	                    try {
+	                        const doc = frame.contentDocument || frame.contentWindow.document;
+	                        if (!doc) return;
+	                        const h = Math.max(
+	                          doc.documentElement.scrollHeight || 0,
+	                          doc.body ? doc.body.scrollHeight : 0
+	                        );
+	                        if (h) frame.style.height = (h + 20) + 'px';
+	                    } catch (e) { /* ignore */ }
+	                }
+	                frame.addEventListener('load', resize);
+	                frame.srcdoc = html || '<!doctype html><html><body><div style="padding:16px;color:#666;">No report content</div></body></html>';
+	            }
+
+	            document.addEventListener("DOMContentLoaded", () => {
+	              const now = new Date();
+	              document.getElementById("current-datetime").textContent = now.toLocaleString();
+	              populateModuleTable();
+
+	              if (HAS_SMARTUI) setIframeHtml('smartui-frame', SMARTUI_HTML);
+	              if (HAS_PERFORMANCE) setIframeHtml('performance-frame', PERFORMANCE_HTML);
+	            });
+	            </script>
+	            </body>
+	            </html>
