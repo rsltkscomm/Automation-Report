@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Automation Test Summary Report</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+/* ===== Last 7 inline circles (replaces the old History popup) ===== */
+.last7-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    width: 100%;
+}
+.mini-circle {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    color: #fff;
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 13px;
+    line-height: 1;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.18);
+    cursor: default;
+    transition: transform 0.15s ease;
+}
+.mini-circle:hover {
+    transform: scale(1.2);
+    z-index: 20;
+}
+.mini-pass { background: linear-gradient(135deg, #22c55e, #16a34a); }
+.mini-fail { background: linear-gradient(135deg, #ef4444, #dc2626); }
+.mini-skip { background: linear-gradient(135deg, #fbbf24, #f59e0b); }
+
+.th-last7 { text-align: center !important; }
+.td-last7 {
+    white-space: nowrap;
+    text-align: center;
+    overflow: visible !important;
+    padding: 8px 4px !important;
+    display: table-cell;
+    vertical-align: middle;
+}
+.last7-row {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 4px;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+}
+
+/* Floating tooltip lives in <body> so it can't be clipped by .table-container overflow */
+#miniTooltip {
+    position: fixed;
+    background: #1e293b;
+    color: #fff;
+    padding: 7px 11px;
+    border-radius: 6px;
+    font-family: 'Segoe UI', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(2px);
+    transition: opacity 0.12s ease, transform 0.12s ease;
+    z-index: 99999;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+}
+#miniTooltip.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+#miniTooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: #1e293b;
+}
+
+/* ===== General Layout ===== */
+body { font-family: 'Segoe UI', sans-serif; background:#f0f4fa; margin:0; color:#333; }
+.header { display:flex; justify-content:space-between; align-items:center; background:linear-gradient(33deg,#8db5f1,#021e49); color:white; padding:10px 20px; }
+.header img { height:40px; }
+.summary-band { background:#0e4494; color:white; display:flex; justify-content:center; gap:30px; padding:8px; font-weight:600; flex-wrap:wrap; }
+.summary-band div { display:flex; align-items:center; gap:5px; }
+.main { display:flex; gap:20px; padding:20px; flex-wrap:wrap; }
+.chart-container { flex:1; display:flex; justify-content:center; align-items:center; min-width:250px; }
+.table-container { flex:1; background:white; padding:15px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.1); overflow-x:hidden; box-sizing:border-box; min-width:300px; width:100%; }
+.table-container table { width:100%; border-collapse:collapse; }
+.table-container th, .table-container td { padding:8px; border-bottom:1px solid #eee; text-align:left; }
+.table-container th { background:#002b6b; color:white; }
+.table-container tbody tr { transition: background 0.15s; cursor: pointer; }
+.table-container tbody tr:hover { background: #eaf2ff !important; box-shadow: inset 3px 0 0 #1a6fd4; }
+.footer { text-align:center; font-size:0.8em; padding:10px; background:#f1f1f1; margin-top:20px; }
+.detailed-section { display: none; }
+
+/* ===== Detail Table ===== */
+#testcaseTable {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 1em;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 16px rgba(14,68,148,0.10);
+}
+#testcaseTable thead tr {
+    background: linear-gradient(90deg, #0e4494 0%, #1a6fd4 100%);
+}
+#testcaseTable thead th {
+    color: #fff;
+    font-weight: 700;
+    padding: 14px 10px;
+    text-align: left;
+    font-size: 0.88em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border: none;
+    white-space: nowrap;
+}
+#testcaseTable thead th.th-expand { width: 40px; text-align: center; }
+#testcaseTable tbody tr:not(.details-row) {
+    background: #fff;
+    transition: background 0.18s;
+    cursor: pointer;
+}
+#testcaseTable tbody tr:not(.details-row):nth-child(even) {
+    background: #f7f9fd;
+}
+#testcaseTable tbody tr:not(.details-row):hover {
+    background: #eaf2ff !important;
+}
+#testcaseTable tbody td {
+    padding: 12px 10px;
+    border-bottom: 1px solid #e8eef5;
+    vertical-align: middle;
+}
+.td-module { font-weight: 600; color: #1e293b; font-size: 0.98em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.td-tcid { font-family: 'Courier New', monospace; font-size: 0.94em; color: #2563eb; font-weight: 700; letter-spacing: 0.3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.td-desc { vertical-align: middle; }
+/* table-layout:fixed keeps each column at its assigned width.
+   The description cell wraps text inside its column so the row height is
+   driven only by the content of that run, not by neighbouring cells growing. */
+#testcaseTable tbody tr:not(.details-row) td {
+    box-sizing: border-box;
+    vertical-align: middle;
+}
+/* Only clip module and tcid columns — never the Last 7 column */
+#testcaseTable tbody td.td-module,
+#testcaseTable tbody td.td-tcid {
+    overflow: hidden;
+}
+.desc-chip {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    background: linear-gradient(90deg, #eff6ff, #e0ecff);
+    color: #1e40af;
+    border: 1px solid #bfdbfe;
+    border-radius: 6px;
+    padding: 7px 12px;
+    font-size: 0.91em;
+    font-weight: 600;
+    letter-spacing: 0.1px;
+    white-space: normal;
+    word-break: break-word;
+    overflow: hidden;
+    line-height: 1.5;
+    vertical-align: middle;
+    box-sizing: border-box;
+    width: 100%;
+    max-height: calc(2 * 1.5em + 14px);
+}
+.td-date { font-size: 0.92em; color: #475569; font-weight: 500; white-space: nowrap; }
+.td-dur { font-size: 0.91em; color: #64748b; white-space: nowrap; text-align: center; }
+
+/* ===== Status Badges ===== */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 14px;
+    border-radius: 20px;
+    font-size: 0.88em;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    white-space: nowrap;
+}
+.badge-pass { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+.badge-fail { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+.badge-skip { background: #fef9c3; color: #92400e; border: 1px solid #fde68a; }
+
+/* ===== Expand Chevron ===== */
+.expand-icon { text-align: center; width: 36px; }
+.chevron {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: #f1f5f9;
+    color: #666;
+    font-size: 10px;
+    transition: all 0.2s ease;
+    border: 1px solid #e2e8f0;
+}
+#testcaseTable tbody tr:hover .chevron {
+    background: #dbeafe;
+    color: #1d4ed8;
+    border-color: #93c5fd;
+}
+
+/* ===== Video Button ===== */
+.video-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: linear-gradient(90deg, #0e4494, #2563eb);
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 0.9em;
+    font-weight: 600;
+    text-decoration: none;
+    transition: opacity 0.15s, transform 0.15s;
+    box-shadow: 0 2px 6px rgba(14,68,148,0.25);
+}
+.video-btn:hover { opacity: 0.92; transform: translateY(-1px); }
+.video-btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px; height: 16px;
+    background: rgba(255,255,255,0.22);
+    border-radius: 50%;
+    font-size: 9px;
+    padding-left: 2px;
+    line-height: 1;
+}
+
+/* ===== Step Table ===== */
+.step-table { width:95%; margin:10px auto; border-collapse:collapse; font-size:0.85em; table-layout:fixed; border-radius:8px; overflow:hidden; }
+.step-table th, .step-table td { border:1px solid #e2e8f0; padding:9px 10px; text-align:left; word-wrap:break-word; overflow-wrap:break-word; }
+.step-table th { background: linear-gradient(90deg,#1e293b,#334155); color:#fff; font-size:0.82em; text-transform:uppercase; letter-spacing:0.5px; }
+.step-table tbody tr { transition: background 0.15s; }
+.step-table tbody tr:hover { background: #eaf2ff !important; }
+.step-table td:nth-child(1), .step-table th:nth-child(1) { width:30%; }
+.step-table td:nth-child(2), .step-table th:nth-child(2) { width:25%; }
+.step-table td:nth-child(3), .step-table th:nth-child(3) { width:25%; }
+.step-table td:nth-child(4), .step-table th:nth-child(4) { width:10%; text-align:center; }
+.step-table td:nth-child(5), .step-table th:nth-child(5) { width:10%; text-align:center; }
+.screenshot { max-width:80px; max-height:80px; object-fit:cover; cursor:pointer; border:1px solid #ccc; border-radius:4px; }
+.environment-ribbon { background:#f4f6f8; padding:10px; font-size:0.9em; border-bottom:1px solid #ddd; display:flex; justify-content:space-around; flex-wrap:wrap; gap:8px; }
+.toolbar input, .toolbar select, .toolbar button { padding:6px 10px; border-radius:5px; border:1px solid #ccc; }
+.toolbar button { background:#007bff; color:white; border:none; cursor:pointer; }
+
+/* ===== Lightbox Modal ===== */
+.modal {
+    display: none; position: fixed; z-index: 9999;
+    padding-top: 60px; left: 0; top: 0;
+    width: 100%; height: 100%; overflow: auto;
+    background-color: rgba(0,0,0,0.9);
+}
+.modal-content { display:block; margin:auto; max-width:80%; max-height:80%; }
+video.modal-content { width:80%; background:black; }
+#closeModal {
+    position:absolute; top:20px; right:35px;
+    color:#fff; font-size:30px; font-weight:bold; cursor:pointer;
+}
+.chart-container canvas { max-width:300px !important; max-height:300px !important; }
+.detailed-report-link { text-align:right; padding:10px; display:block; }
+.detailed-report-link a { text-decoration:none; }
+.back-btn {
+    background: linear-gradient(90deg, #0e4494 0%, #1a6fd4 100%);
+    color: #fff;
+    padding: 10px 22px;
+    border-radius: 999px;
+    text-decoration: none;
+    box-shadow: 0 4px 14px rgba(14,68,148,0.30);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 14px 0;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.95em;
+    letter-spacing: 0.2px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+    border: none;
+}
+.back-btn:hover {
+    opacity: 0.95;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(14,68,148,0.36);
+}
+.back-btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.05em;
+    line-height: 1;
+}
+.status-pass { color:#28a745; font-weight:bold; }
+.status-fail { color:#dc3545; font-weight:bold; }
+.status-skipped { color:#ffc107; font-weight:bold; }
+.sla-pass { color:#28a745; font-weight:bold; }
+.sla-fail { color:#dc3545; font-weight:bold; }
+</style>
+</head>
+<body>
+
+<!-- ===== Summary Section ===== -->
+<div id="summary-section">
+    <div class="header">
+        <img alt="Company Logo" src="https://www.resulticks.com/images/logos/resulticks-logo-blue.svg"/>
+        <h2>Automation Test Summary Report</h2>
+        <img alt="Product Logo" src="https://run19.resul.io/assets/resulticks-logo-white-391eec89.svg"/>
+    </div>
+    <div class="summary-band">
+        <div>📊 Total: 5</div>
+        <div>✅ Passed: 3</div>
+        <div>❌ Failed: 2</div>
+        <div>⚠️ Skipped: 0</div>
+        <div>⏱️ Duration: 00:13:30</div>
+        <div>🎯 SLA: 90%</div>
+        <div>🎯 Pass Rate: 60.00%</div>
+    </div>
+    <div class="detailed-report-link">
+        <a class="back-btn" onclick="showDetailedReport()"><span class="back-btn-icon">&#8594;</span> Detailed Report</a>
+    </div>
+    <div class="main">
+        <div class="chart-container">
+            <canvas id="chart1"></canvas>
+        </div>
+        <div class="table-container">
+            <h3>Module-wise Results</h3>
+            <table>
+                <tr><th>Module</th><th>Total</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Duration</th><th>SLA %</th><th>Pass %</th></tr>
+                <tbody id="moduleTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+    <div class="footer">
+        Report generated on <span id="current-datetime">26-06-15 03:14:08</span> |
+        Contact: <a href="mailto:qaautomation@resulticks.com">qaautomation@resulticks.com</a>
+    </div>
+</div>
+
+<!-- ===== Detailed Section ===== -->
+<div id="detailed-section" class="detailed-section" style="padding:20px; box-sizing:border-box; width:100%;">
+    <div class="header"><img alt="Company Logo" src="https://www.resulticks.com/images/logos/resulticks-logo-blue.svg"/><h2>Detail Test Report</h2><img alt="Product Logo" src="https://run.resulticks.com/assets/resulticks-logo-white-391eec89.svg"/></div><div class="environment-ribbon"><span><strong>Environment:</strong> run</span><span><strong>Browser:</strong> chrome</span><span><strong>Release:</strong> 5.0</span><span><strong>Execution Date:</strong> 26-06-15 03:14:08</span></div><div style="text-align:right; padding:10px;"><a class="back-btn" onclick="showSummaryReport()"><span class="back-btn-icon">&#8592;</span> Back to Summary</a></div><div class="table-container"><h3>Test Case Results</h3><div class="toolbar"><div style="display:flex; gap:15px; flex-wrap:wrap; margin:20px 0;"><div><label><b>Search:</b></label><input id="searchInput" placeholder="Search test cases..." type="text"/></div><div><label><b>Filter by Status:</b></label><select id="statusFilter"><option value="">All</option><option value="PASS">Passed</option><option value="FAIL">Failed</option><option value="SKIPPED">Skipped</option></select></div></div></div><table id="testcaseTable">
+<colgroup>
+  <col style="width:40px">
+  <col style="width:11%">
+  <col style="width:10%">
+  <col>
+  <col style="width:9%">
+  <col style="width:8%">
+  <col style="width:10%">
+  <col style="width:26%">
+</colgroup>
+<thead><tr>
+  <th class="th-expand"></th>
+  <th>Module</th>
+  <th>Test Case ID</th>
+  <th>Description</th>
+  <th style="text-align:center;">Status</th>
+  <th style="text-align:center;">Duration</th>
+  <th style="text-align:center;">Video</th>
+  <th class="th-last7">Last 7 Execution</th>
+</tr></thead><tbody><tr data-test-id="tc1" data-status="PASS" data-expanded="false" data-module="AUDIENCE" data-testcaseid="RS-T1695" data-rundate="26-06-15 0" data-duration="232s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">AUDIENCE</td><td class="td-tcid">RS-T1695</td><td class="td-desc"><span class="desc-chip">Verify user is able to create and approve a dynamic list using website trigger</span></td><td style="text-align:center;"><span class="badge badge-pass">&#10003; Passed</span></td><td class="td-dur" style="text-align:center;">232s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T1695_20260614213421471311_test_verify_user_is_able_to_create_and_approve_a_dynamic_list_using_website_trigger_20260615030421.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 09 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 10 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 11 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 12 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 13 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 14 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Mon, 15 Jun 2026 - Skipped">&minus;</span></div></td></tr><tr class="details-row" id="tc1-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User successfully logged in.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260614213158259682_RS-T1695_20260615030158178266.jpg"/></td></tr><tr><td>Navigate to Audience Dynamic List section</td><td>User should navigate to the Audience Dynamic List section</td><td>User navigated to the Audience Dynamic List section successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260614213200871427_RS-T1695_20260615030200607902.jpg"/></td></tr><tr><td>Click Create Dynamic List</td><td>User should be able to open the Create Dynamic List page</td><td>Create Dynamic List page opened successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260614213201335744_RS-T1695_20260615030201251880.jpg"/></td></tr><tr><td>Enter unique Dynamic List Name</td><td>User should enter a unique Dynamic List Name</td><td>Dynamic List Name entered successfully.
+List Name: DynamicWebsite030201_15062026_AM</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260614213206676815_RS-T1695_20260615030206511177.jpg"/></td></tr><tr><td>Select Trigger Source</td><td>User should select Trigger Source as Website</td><td>Trigger Source selected successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260614213211174959_RS-T1695_20260615030211075705.jpg"/></td></tr><tr><td>Select Trigger Type</td><td>User should select the Trigger Type</td><td>Trigger Type selected successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260614213217024344_RS-T1695_20260615030216928803.jpg"/></td></tr><tr><td>Configure Rule One with Rule Type, Type, and Value</td><td>User should configure Rule One successfully</td><td>Rule One configured successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260614213227656791_RS-T1695_20260615030227507035.jpg"/></td></tr><tr><td>Select Approver One</td><td>User should select Approver One</td><td>Approver One selected successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260614213232208992_RS-T1695_20260615030232098742.jpg"/></td></tr><tr><td>Click Create Rule</td><td>Rule should be created successfully</td><td>Rule created successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260614213237489041_RS-T1695_20260615030237371915.jpg"/></td></tr><tr><td>Search created Dynamic List by name</td><td>User should be able to search the created Dynamic List</td><td>Dynamic List searched successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260614213244601723_RS-T1695_20260615030244491236.jpg"/></td></tr><tr><td>Verify Dynamic List appears in search results</td><td>Dynamic List should appear in search results</td><td>Dynamic List appeared in search results.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260614213245918579_RS-T1695_20260615030245815306.jpg"/></td></tr><tr><td>Verify Approval Status</td><td>Approval Status should display &quot;Pending for Approval&quot;</td><td>Approval Status displayed as Pending for Approval.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260614213248145638_RS-T1695_20260615030248066129.jpg"/></td></tr><tr><td>Verify Executed Communication Count</td><td>Executed Communication Count should be 0</td><td>Executed Communication Count verified as 0.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260614213248249223_RS-T1695_20260615030248209685.jpg"/></td></tr><tr><td>Approver logs in using approval credentials</td><td>Approver should log in successfully</td><td>Approver logged in successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260614213343137765_RS-T1695_20260615030343085004.jpg"/></td></tr><tr><td>Navigate to Audience Dynamic List section</td><td>User should navigate to the Audience Dynamic List section</td><td>User navigated to the Audience Dynamic List section successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260614213346531804_RS-T1695_20260615030346456489.jpg"/></td></tr><tr><td>Search created Dynamic List by name</td><td>User should be able to search the created Dynamic List</td><td>Dynamic List searched successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260614213353087515_RS-T1695_20260615030353022182.jpg"/></td></tr><tr><td>Verify Dynamic List appears in search results</td><td>Dynamic List should appear in search results</td><td>Dynamic List appeared in search results.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260614213354282155_RS-T1695_20260615030354199323.jpg"/></td></tr><tr><td>Click Dynamic List Approve icon</td><td>User should be able to click the Dynamic List Approve icon successfully</td><td>Dynamic List Approve icon clicked successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260614213354555976_RS-T1695_20260615030354399368.jpg"/></td></tr><tr><td>Click Approve</td><td>Request should be approved successfully</td><td>Request approved successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260614213405333971_RS-T1695_20260615030405201333.jpg"/></td></tr><tr><td>Search Dynamic List by name</td><td>User should be able to search the Dynamic List</td><td>Dynamic List searched successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260614213417603995_RS-T1695_20260615030417530657.jpg"/></td></tr><tr><td>Verify Dynamic List appears in search results</td><td>Dynamic List should appear in search results</td><td>Dynamic List appeared in search results.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260614213418835559_RS-T1695_20260615030418759423.jpg"/></td></tr><tr><td>Verify Approval Status</td><td>Approval Status should display &quot;Request Approved&quot;</td><td>Approval Status displayed as Request Approved.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260614213421003197_RS-T1695_20260615030420956683.jpg"/></td></tr></table></td></tr><tr data-test-id="tc2" data-status="FAIL" data-expanded="false" data-module="AUDIENCE" data-testcaseid="RS-T151" data-rundate="26-06-15 0" data-duration="535s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">AUDIENCE</td><td class="td-tcid">RS-T151</td><td class="td-desc"><span class="desc-chip">Verify user is able to create a dynamic list using target list trigger</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">535s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T151_20260614214317538839_test_verify_user_is_able_to_create_a_dynamic_list_using_target_list_trigger_20260615031317.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 09 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 10 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 11 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 12 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 13 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 14 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Mon, 15 Jun 2026 - Skipped">&minus;</span></div></td></tr><tr class="details-row" id="tc2-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User successfully logged in.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T151_20260614213540207564_RS-T151_20260615030540140910.jpg"/></td></tr><tr><td>Navigate to Audience Dynamic List section</td><td>User should navigate to the Audience Dynamic List section</td><td>User navigated to the Audience Dynamic List section successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T151_20260614213541819813_RS-T151_20260615030541746561.jpg"/></td></tr><tr><td>Click Create Dynamic List</td><td>User should be able to open the Create Dynamic List page</td><td>Create Dynamic List page opened successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T151_20260614213542156672_RS-T151_20260615030542076122.jpg"/></td></tr><tr><td>Enter unique Dynamic List Name</td><td>User should enter a unique Dynamic List Name</td><td>Dynamic List Name entered successfully.
+List Name: DynamicTargetList030542_15062026_AM</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T151_20260614213547037067_RS-T151_20260615030546951833.jpg"/></td></tr><tr><td>Select Trigger Source</td><td>User should select Trigger Source as Target list</td><td>Trigger Source selected successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T151_20260614213551763461_RS-T151_20260615030551687386.jpg"/></td></tr><tr><td>Configure Target List Rule</td><td>User should configure the target list rule</td><td>Target list rule configured successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T151_20260614213556163163_RS-T151_20260615030556066894.jpg"/></td></tr><tr><td>Select Approver One</td><td>User should select Approver One</td><td>Failed to select Approver One</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T151_20260614213600479078_RS-T151_20260615030600377425.jpg"/></td></tr><tr><td>Click Create Rule</td><td>Rule should be created successfully</td><td>Failed to create rule</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T151_20260614213630646121_RS-T151_20260615030630580226.jpg"/></td></tr><tr><td>Search created Dynamic List by name</td><td>User should be able to search the created Dynamic List</td><td>Failed to search Dynamic List</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T151_20260614213655842815_RS-T151_20260615030655742099.jpg"/></td></tr><tr><td>Verify Dynamic List appears in search results</td><td>Dynamic List should appear in search results</td><td>Dynamic List not found in search results</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T151_20260614213656007083_RS-T151_20260615030655908310.jpg"/></td></tr><tr><td>Verify Approval Status</td><td>Approval Status should display &quot;Pending for Approval&quot;</td><td>Approval Status mismatch</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T151_20260614213726162595_RS-T151_20260615030726060886.jpg"/></td></tr><tr><td>Verify Executed Communication Count</td><td>Executed Communication Count should be 0</td><td>Executed Communication Count is not 0</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T151_20260614213826340299_RS-T151_20260615030826217090.jpg"/></td></tr><tr><td>Approver logs in using approval credentials</td><td>Approver should log in successfully</td><td>Approver logged in successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T151_20260614213922455443_RS-T151_20260615030922383418.jpg"/></td></tr><tr><td>Navigate to Audience Dynamic List section</td><td>User should navigate to the Audience Dynamic List section</td><td>User navigated to the Audience Dynamic List section successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T151_20260614213925336588_RS-T151_20260615030925247949.jpg"/></td></tr><tr><td>Search created Dynamic List by name</td><td>User should be able to search the created Dynamic List</td><td>Failed to search Dynamic List</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T151_20260614213931006527_RS-T151_20260615030930922269.jpg"/></td></tr><tr><td>Verify Dynamic List appears in search results</td><td>Dynamic List should appear in search results</td><td>Dynamic List not found in search results</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T151_20260614214103347917_RS-T151_20260615031103246594.jpg"/></td></tr><tr><td>Click Dynamic List Approve icon</td><td>User should be able to click the Dynamic List Approve icon successfully</td><td>Failed to click the Dynamic List Approve icon</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T151_20260614214103526428_RS-T151_20260615031103463321.jpg"/></td></tr><tr><td>Click Approve</td><td>Request should be approved successfully</td><td>Failed to approve request</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T151_20260614214123704286_RS-T151_20260615031123656822.jpg"/></td></tr><tr><td>Search Dynamic List by name</td><td>User should be able to search the Dynamic List</td><td>Failed to search Dynamic List</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T151_20260614214144633066_RS-T151_20260615031144510523.jpg"/></td></tr><tr><td>Verify Dynamic List appears in search results</td><td>Dynamic List should appear in search results</td><td>Dynamic List not found in search results</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T151_20260614214316949176_RS-T151_20260615031316843305.jpg"/></td></tr><tr><td>Verify Approval Status</td><td>Approval Status should display &quot;Request Approved&quot;</td><td>Approval Status mismatch</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T151_20260614214317111453_RS-T151_20260615031317027756.jpg"/></td></tr></table></td></tr><tr data-test-id="tc3" data-status="PASS" data-expanded="false" data-module="AUDIENCE" data-testcaseid="RS-T1682" data-rundate="26-06-15 0" data-duration="235s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">AUDIENCE</td><td class="td-tcid">RS-T1682</td><td class="td-desc"><span class="desc-chip">Verify user is able to create and approve a dynamic list using mobile app trigger</span></td><td style="text-align:center;"><span class="badge badge-pass">&#10003; Passed</span></td><td class="td-dur" style="text-align:center;">235s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T1682_20260614213424625889_test_verify_user_is_able_to_create_and_approve_a_dynamic_list_using_mobile_app_trigger_20260615030424.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 09 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 10 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 11 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 12 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 13 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 14 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Mon, 15 Jun 2026 - Skipped">&minus;</span></div></td></tr><tr class="details-row" id="tc3-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User successfully logged in.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1682_20260614213159316483_RS-T1682_20260615030158818563.jpg"/></td></tr><tr><td>Navigate to Audience Dynamic List section</td><td>User should navigate to the Audience Dynamic List section</td><td>User navigated to the Audience Dynamic List section successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1682_20260614213202270392_RS-T1682_20260615030201971857.jpg"/></td></tr><tr><td>Click Create Dynamic List</td><td>User should be able to open the Create Dynamic List page</td><td>Create Dynamic List page opened successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1682_20260614213203060693_RS-T1682_20260615030202943384.jpg"/></td></tr><tr><td>Enter unique Dynamic List Name</td><td>User should enter a unique Dynamic List Name</td><td>Dynamic List Name entered successfully.
+List Name: DynamicMobileApp030203_15062026_AM</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1682_20260614213207270249_RS-T1682_20260615030207212213.jpg"/></td></tr><tr><td>Select Trigger Source</td><td>User should select Trigger Source as Mobile app</td><td>Trigger Source selected successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1682_20260614213212257632_RS-T1682_20260615030212081776.jpg"/></td></tr><tr><td>Select Trigger Type</td><td>User should select the Trigger Type</td><td>Trigger Type selected successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1682_20260614213218627567_RS-T1682_20260615030218570228.jpg"/></td></tr><tr><td>Configure Rule One with Rule Type, Type, and Value</td><td>User should configure Rule One successfully</td><td>Rule One configured successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1682_20260614213228673384_RS-T1682_20260615030228592241.jpg"/></td></tr><tr><td>Select Approver One</td><td>User should select Approver One</td><td>Approver One selected successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1682_20260614213233179348_RS-T1682_20260615030233087320.jpg"/></td></tr><tr><td>Click Create Rule</td><td>Rule should be created successfully</td><td>Rule created successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1682_20260614213238667875_RS-T1682_20260615030238588401.jpg"/></td></tr><tr><td>Search created Dynamic List by name</td><td>User should be able to search the created Dynamic List</td><td>Dynamic List searched successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1682_20260614213244993844_RS-T1682_20260615030244825899.jpg"/></td></tr><tr><td>Verify Dynamic List appears in search results</td><td>Dynamic List should appear in search results</td><td>Dynamic List appeared in search results.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1682_20260614213246208169_RS-T1682_20260615030246165068.jpg"/></td></tr><tr><td>Verify Approval Status</td><td>Approval Status should display &quot;Pending for Approval&quot;</td><td>Approval Status displayed as Pending for Approval.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1682_20260614213248429986_RS-T1682_20260615030248339063.jpg"/></td></tr><tr><td>Verify Executed Communication Count</td><td>Executed Communication Count should be 0</td><td>Executed Communication Count verified as 0.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1682_20260614213248584468_RS-T1682_20260615030248532481.jpg"/></td></tr><tr><td>Approver logs in using approval credentials</td><td>Approver should log in successfully</td><td>Approver logged in successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1682_20260614213343482183_RS-T1682_20260615030343379649.jpg"/></td></tr><tr><td>Navigate to Audience Dynamic List section</td><td>User should navigate to the Audience Dynamic List section</td><td>User navigated to the Audience Dynamic List section successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1682_20260614213347275489_RS-T1682_20260615030347148475.jpg"/></td></tr><tr><td>Search created Dynamic List by name</td><td>User should be able to search the created Dynamic List</td><td>Dynamic List searched successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1682_20260614213354737700_RS-T1682_20260615030354612470.jpg"/></td></tr><tr><td>Verify Dynamic List appears in search results</td><td>Dynamic List should appear in search results</td><td>Dynamic List appeared in search results.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1682_20260614213356627089_RS-T1682_20260615030356513625.jpg"/></td></tr><tr><td>Click Dynamic List Approve icon</td><td>User should be able to click the Dynamic List Approve icon successfully</td><td>Dynamic List Approve icon clicked successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1682_20260614213357752030_RS-T1682_20260615030357451602.jpg"/></td></tr><tr><td>Click Approve</td><td>Request should be approved successfully</td><td>Request approved successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1682_20260614213407394342_RS-T1682_20260615030407283870.jpg"/></td></tr><tr><td>Search Dynamic List by name</td><td>User should be able to search the Dynamic List</td><td>Dynamic List searched successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1682_20260614213420624978_RS-T1682_20260615030420535260.jpg"/></td></tr><tr><td>Verify Dynamic List appears in search results</td><td>Dynamic List should appear in search results</td><td>Dynamic List appeared in search results.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1682_20260614213421777828_RS-T1682_20260615030421711727.jpg"/></td></tr><tr><td>Verify Approval Status</td><td>Approval Status should display &quot;Request Approved&quot;</td><td>Approval Status displayed as Request Approved.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1682_20260614213424063704_RS-T1682_20260615030423922977.jpg"/></td></tr></table></td></tr><tr data-test-id="tc4" data-status="FAIL" data-expanded="false" data-module="AUDIENCE" data-testcaseid="RS-T147" data-rundate="26-06-15 0" data-duration="566s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">AUDIENCE</td><td class="td-tcid">RS-T147</td><td class="td-desc"><span class="desc-chip">Verify user is able to create a dynamic list using subscription form trigger</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">566s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T147_20260614214352649299_test_verify_user_is_able_to_create_a_dynamic_list_using_subscription_form_trigger_20260615031352.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 09 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 10 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 11 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 12 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 13 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 14 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Mon, 15 Jun 2026 - Skipped">&minus;</span></div></td></tr><tr class="details-row" id="tc4-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User successfully logged in.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T147_20260614213542015896_RS-T147_20260615030541919615.jpg"/></td></tr><tr><td>Navigate to Audience Dynamic List section</td><td>User should navigate to the Audience Dynamic List section</td><td>User navigated to the Audience Dynamic List section successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T147_20260614213544608476_RS-T147_20260615030544541148.jpg"/></td></tr><tr><td>Click Create Dynamic List</td><td>User should be able to open the Create Dynamic List page</td><td>Create Dynamic List page opened successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T147_20260614213544894181_RS-T147_20260615030544843382.jpg"/></td></tr><tr><td>Enter unique Dynamic List Name</td><td>User should enter a unique Dynamic List Name</td><td>Dynamic List Name entered successfully.
+List Name: DynamicSubscriptionForm030544_15062026_AM</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T147_20260614213549258290_RS-T147_20260615030549183547.jpg"/></td></tr><tr><td>Select Trigger Source</td><td>User should select Trigger Source as Subscription form</td><td>Trigger Source selected successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T147_20260614213554439101_RS-T147_20260615030554392349.jpg"/></td></tr><tr><td>Configure Rule One with Rule Type, Type, and Value</td><td>User should configure Rule One successfully</td><td>Failed to configure Rule One</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T147_20260614213634171201_RS-T147_20260615030634033209.jpg"/></td></tr><tr><td>Select Approver One</td><td>User should select Approver One</td><td>Approver One selected successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T147_20260614213638546759_RS-T147_20260615030638504978.jpg"/></td></tr><tr><td>Click Create Rule</td><td>Rule should be created successfully</td><td>Failed to create rule</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T147_20260614213708743374_RS-T147_20260615030708662910.jpg"/></td></tr><tr><td>Search created Dynamic List by name</td><td>User should be able to search the created Dynamic List</td><td>Failed to search Dynamic List</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T147_20260614213733937293_RS-T147_20260615030733831277.jpg"/></td></tr><tr><td>Verify Dynamic List appears in search results</td><td>Dynamic List should appear in search results</td><td>Dynamic List not found in search results</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T147_20260614213734054081_RS-T147_20260615030734000028.jpg"/></td></tr><tr><td>Verify Approval Status</td><td>Approval Status should display &quot;Pending for Approval&quot;</td><td>Approval Status mismatch</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T147_20260614213804315980_RS-T147_20260615030804212847.jpg"/></td></tr><tr><td>Verify Executed Communication Count</td><td>Executed Communication Count should be 0</td><td>Executed Communication Count is not 0</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T147_20260614213904443004_RS-T147_20260615030904375229.jpg"/></td></tr><tr><td>Approver logs in using approval credentials</td><td>Approver should log in successfully</td><td>Approver logged in successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T147_20260614213959865167_RS-T147_20260615030959808422.jpg"/></td></tr><tr><td>Navigate to Audience Dynamic List section</td><td>User should navigate to the Audience Dynamic List section</td><td>User navigated to the Audience Dynamic List section successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T147_20260614214001439833_RS-T147_20260615031001400254.jpg"/></td></tr><tr><td>Search created Dynamic List by name</td><td>User should be able to search the created Dynamic List</td><td>Failed to search Dynamic List</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T147_20260614214006612992_RS-T147_20260615031006538898.jpg"/></td></tr><tr><td>Verify Dynamic List appears in search results</td><td>Dynamic List should appear in search results</td><td>Dynamic List not found in search results</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T147_20260614214139066236_RS-T147_20260615031138977161.jpg"/></td></tr><tr><td>Click Dynamic List Approve icon</td><td>User should be able to click the Dynamic List Approve icon successfully</td><td>Failed to click the Dynamic List Approve icon</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T147_20260614214139235604_RS-T147_20260615031139181815.jpg"/></td></tr><tr><td>Click Approve</td><td>Request should be approved successfully</td><td>Failed to approve request</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T147_20260614214159429572_RS-T147_20260615031159353099.jpg"/></td></tr><tr><td>Search Dynamic List by name</td><td>User should be able to search the Dynamic List</td><td>Failed to search Dynamic List</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T147_20260614214219781369_RS-T147_20260615031219635437.jpg"/></td></tr><tr><td>Verify Dynamic List appears in search results</td><td>Dynamic List should appear in search results</td><td>Dynamic List not found in search results</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T147_20260614214352072932_RS-T147_20260615031351986262.jpg"/></td></tr><tr><td>Verify Approval Status</td><td>Approval Status should display &quot;Request Approved&quot;</td><td>Approval Status mismatch</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T147_20260614214352198188_RS-T147_20260615031352153574.jpg"/></td></tr></table></td></tr><tr data-test-id="tc5" data-status="PASS" data-expanded="false" data-module="AUDIENCE" data-testcaseid="RS-T149" data-rundate="26-06-15 0" data-duration="226s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">AUDIENCE</td><td class="td-tcid">RS-T149</td><td class="td-desc"><span class="desc-chip">Verify user is able to create a dynamic list using audience base trigger</span></td><td style="text-align:center;"><span class="badge badge-pass">&#10003; Passed</span></td><td class="td-dur" style="text-align:center;">226s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T149_20260614213415851666_test_verify_user_is_able_to_create_a_dynamic_list_using_audience_base_trigger_20260615030415.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 09 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 10 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 11 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 12 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 13 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 14 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Mon, 15 Jun 2026 - Skipped">&minus;</span></div></td></tr><tr class="details-row" id="tc5-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User successfully logged in.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T149_20260614213153579756_RS-T149_20260615030153412304.jpg"/></td></tr><tr><td>Navigate to Audience Dynamic List section</td><td>User should navigate to the Audience Dynamic List section</td><td>User navigated to the Audience Dynamic List section successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T149_20260614213156433929_RS-T149_20260615030156369878.jpg"/></td></tr><tr><td>Click Create Dynamic List</td><td>User should be able to open the Create Dynamic List page</td><td>Create Dynamic List page opened successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T149_20260614213157615828_RS-T149_20260615030157395590.jpg"/></td></tr><tr><td>Enter unique Dynamic List Name</td><td>User should enter a unique Dynamic List Name</td><td>Dynamic List Name entered successfully.
+List Name: DynamicAudienceBase030157_15062026_AM</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T149_20260614213201948442_RS-T149_20260615030201835584.jpg"/></td></tr><tr><td>Select Trigger Source</td><td>User should select Trigger Source as Audience Base</td><td>Trigger Source selected successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T149_20260614213206834901_RS-T149_20260615030206743933.jpg"/></td></tr><tr><td>Configure Rule One with Rule Type, Type, and Value</td><td>User should configure Rule One successfully</td><td>Rule One configured successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T149_20260614213216714685_RS-T149_20260615030216658732.jpg"/></td></tr><tr><td>Select Approver One</td><td>User should select Approver One</td><td>Approver One selected successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T149_20260614213221310535_RS-T149_20260615030221220663.jpg"/></td></tr><tr><td>Click Create Rule</td><td>Rule should be created successfully</td><td>Rule created successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T149_20260614213227668520_RS-T149_20260615030227565812.jpg"/></td></tr><tr><td>Search created Dynamic List by name</td><td>User should be able to search the created Dynamic List</td><td>Dynamic List searched successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T149_20260614213234923449_RS-T149_20260615030234814385.jpg"/></td></tr><tr><td>Verify Dynamic List appears in search results</td><td>Dynamic List should appear in search results</td><td>Dynamic List appeared in search results.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T149_20260614213236503320_RS-T149_20260615030236283827.jpg"/></td></tr><tr><td>Verify Approval Status</td><td>Approval Status should display &quot;Pending for Approval&quot;</td><td>Approval Status displayed as Pending for Approval.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T149_20260614213239669918_RS-T149_20260615030239589553.jpg"/></td></tr><tr><td>Verify Executed Communication Count</td><td>Executed Communication Count should be 0</td><td>Executed Communication Count verified as 0.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T149_20260614213239781791_RS-T149_20260615030239729546.jpg"/></td></tr><tr><td>Approver logs in using approval credentials</td><td>Approver should log in successfully</td><td>Approver logged in successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T149_20260614213334221752_RS-T149_20260615030334154634.jpg"/></td></tr><tr><td>Navigate to Audience Dynamic List section</td><td>User should navigate to the Audience Dynamic List section</td><td>User navigated to the Audience Dynamic List section successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T149_20260614213336711185_RS-T149_20260615030336643081.jpg"/></td></tr><tr><td>Search created Dynamic List by name</td><td>User should be able to search the created Dynamic List</td><td>Dynamic List searched successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T149_20260614213344107694_RS-T149_20260615030343986193.jpg"/></td></tr><tr><td>Verify Dynamic List appears in search results</td><td>Dynamic List should appear in search results</td><td>Dynamic List appeared in search results.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T149_20260614213346973727_RS-T149_20260615030346838759.jpg"/></td></tr><tr><td>Click Dynamic List Approve icon</td><td>User should be able to click the Dynamic List Approve icon successfully</td><td>Dynamic List Approve icon clicked successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T149_20260614213347780206_RS-T149_20260615030347660236.jpg"/></td></tr><tr><td>Click Approve</td><td>Request should be approved successfully</td><td>Request approved successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T149_20260614213358600835_RS-T149_20260615030358475999.jpg"/></td></tr><tr><td>Search Dynamic List by name</td><td>User should be able to search the Dynamic List</td><td>Dynamic List searched successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T149_20260614213411555714_RS-T149_20260615030411480006.jpg"/></td></tr><tr><td>Verify Dynamic List appears in search results</td><td>Dynamic List should appear in search results</td><td>Dynamic List appeared in search results.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T149_20260614213412899116_RS-T149_20260615030412742122.jpg"/></td></tr><tr><td>Verify Approval Status</td><td>Approval Status should display &quot;Request Approved&quot;</td><td>Approval Status displayed as Request Approved.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T149_20260614213415385592_RS-T149_20260615030415288591.jpg"/></td></tr></table></td></tr></tbody></table></div>
+<script>
+function toggleDetails(row) {
+    // row could be the <tr> itself (passed from onclick on the expand td)
+    if (!row || !row.getAttribute) return;
+    var detailsRow = document.getElementById(row.getAttribute('data-test-id') + '-details');
+    if (!detailsRow) return;
+    var expandIcon = row.querySelector('.expand-icon .chevron');
+    if (detailsRow.style.display === 'none') {
+        detailsRow.style.display = 'table-row';
+        row.setAttribute('data-expanded', 'true');
+        if (expandIcon) { expandIcon.innerHTML = '&#9660;'; expandIcon.style.color = '#0e4494'; }
+    } else {
+        detailsRow.style.display = 'none';
+        row.setAttribute('data-expanded', 'false');
+        if (expandIcon) { expandIcon.innerHTML = '&#9654;'; expandIcon.style.color = '#666'; }
+    }
+}
+
+function playVideoHandler(event, element) {
+    event.stopPropagation();
+    event.preventDefault();
+    var modal = document.getElementById('lightboxModal');
+    var modalImg = document.getElementById('lightboxImage');
+    var modalVideo = document.getElementById('lightboxVideo');
+    if (modal && modalImg && modalVideo) {
+        modalImg.style.display = 'none';
+        modalImg.src = '';
+        modalVideo.src = element.getAttribute('data-video');
+        modalVideo.style.display = 'block';
+        modal.style.display = 'block';
+        modalVideo.play();
+    }
+}
+
+function applySearchAndFilter() {
+    var searchText = document.getElementById('searchInput').value.toLowerCase().trim();
+    var filterValue = document.getElementById('statusFilter').value;
+    var mainRows = document.querySelectorAll('#testcaseTable > tbody > tr:not(.details-row)');
+    mainRows.forEach(function(row) {
+        var rowText = row.textContent.toLowerCase();
+        var rowStatus = row.getAttribute('data-status') || '';
+        var matchesSearch = !searchText || rowText.includes(searchText);
+        var matchesFilter = !filterValue || rowStatus === filterValue;
+        var shouldShow = matchesSearch && matchesFilter;
+        var testId = row.getAttribute('data-test-id');
+        var detailsRow = document.getElementById(testId + '-details');
+        if (shouldShow) {
+            row.style.display = '';
+            if (detailsRow) {
+                var expanded = row.getAttribute('data-expanded') === 'true';
+                detailsRow.style.display = expanded ? 'table-row' : 'none';
+            }
+        } else {
+            row.style.display = 'none';
+            if (detailsRow) detailsRow.style.display = 'none';
+            var ch = row.querySelector('.expand-icon .chevron');
+            if (ch) { ch.innerHTML = '&#9654;'; ch.style.color = '#666'; }
+            row.setAttribute('data-expanded', 'false');
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    var searchInput = document.getElementById('searchInput');
+    var statusFilter = document.getElementById('statusFilter');
+    if (searchInput) searchInput.addEventListener('input', applySearchAndFilter);
+    if (statusFilter) statusFilter.addEventListener('change', applySearchAndFilter);
+});
+</script>
+        
+</div>
+
+<!-- ===== Lightbox Modal ===== -->
+<div class="modal" id="lightboxModal">
+    <span id="closeModal">&#x2716;</span>
+    <img class="modal-content" id="lightboxImage" style="display:none;"/>
+    <video class="modal-content" id="lightboxVideo" controls style="display:none;"></video>
+</div>
+
+<!-- Floating tooltip for the Last 7 circles (body-level so it isn't clipped by table overflow) -->
+<div id="miniTooltip"></div>
+
+<script>
+/* ===== Navigation ===== */
+function showDetailedReport(moduleFilter) {
+    document.getElementById("summary-section").style.display = "none";
+    document.getElementById("detailed-section").style.display = "block";
+    window.scrollTo(0, 0);
+
+    // Apply module filter if provided, otherwise show all rows
+    var mainRows = document.querySelectorAll('#testcaseTable > tbody > tr:not(.details-row)');
+    mainRows.forEach(function(row) {
+        var rowModule = (row.getAttribute('data-module') || '').toUpperCase().trim();
+        var filterModule = moduleFilter ? moduleFilter.toUpperCase().trim() : '';
+        var shouldShow = !filterModule || rowModule === filterModule;
+        var testId = row.getAttribute('data-test-id');
+        var detailsRow = document.getElementById(testId + '-details');
+        if (shouldShow) {
+            row.style.display = '';
+            if (detailsRow) {
+                var expanded = row.getAttribute('data-expanded') === 'true';
+                detailsRow.style.display = expanded ? 'table-row' : 'none';
+            }
+        } else {
+            row.style.display = 'none';
+            if (detailsRow) detailsRow.style.display = 'none';
+        }
+    });
+
+    // Reset the search/filter controls to reflect no active text/status filter
+    var searchInput = document.getElementById('searchInput');
+    var statusFilter = document.getElementById('statusFilter');
+    if (searchInput) searchInput.value = '';
+    if (statusFilter) statusFilter.value = '';
+}
+function showSummaryReport() {
+    document.getElementById("detailed-section").style.display = "none";
+    document.getElementById("summary-section").style.display = "block";
+    window.scrollTo(0, 0);
+}
+
+/* ===== Doughnut Chart ===== */
+document.addEventListener('DOMContentLoaded', function() {
+    var ctx = document.getElementById('chart1');
+    if (ctx) {
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Passed', 'Failed', 'Skipped'],
+                datasets: [{
+                    data: [3, 2, 0],
+                    backgroundColor: ['#28a745', '#dc3545', '#ffc107']
+                }]
+            },
+            options: { plugins: { legend: { position: 'bottom' } } }
+        });
+    }
+    showSummaryReport();
+    populateModuleTable();
+});
+
+/* ===== Module Table ===== */
+var moduleDataRaw = "[{\"module\": \"AUDIENCE\", \"total\": 5, \"passed\": 3, \"failed\": 2, \"skipped\": 0, \"durationMillis\": 1795508}]";
+var moduleData = [];
+try { moduleData = JSON.parse(moduleDataRaw); } catch (e) { console.error('Failed to parse module data:', e); }
+
+function formatDuration(ms) {
+    if (!ms || ms <= 0) return '-';
+    var totalSeconds = Math.floor(ms / 1000);
+    var hours = Math.floor(totalSeconds / 3600);
+    var minutes = Math.floor((totalSeconds % 3600) / 60);
+    var seconds = totalSeconds % 60;
+    var pad = function(n) { return n.toString().padStart(2, '0'); };
+    return pad(hours) + ':' + pad(minutes) + ':' + pad(seconds);
+}
+
+function populateModuleTable() {
+    var tableBody = document.getElementById('moduleTableBody');
+    if (!tableBody) return;
+
+    if (!moduleData || moduleData.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#666;">No module data available</td></tr>';
+        return;
+    }
+
+    tableBody.innerHTML = moduleData.map(function(m) {
+        var successRate = m.total > 0 ? ((m.passed / m.total) * 100).toFixed(0) : '0';
+        var slaRate = 90;
+        var modName = (m.module || 'Unknown Module');
+        return '<tr class="module-summary-row" data-filter-module="' + modName + '" style="cursor:pointer;">'
+            + '<td>' + modName + '</td>'
+            + '<td>' + (m.total || 0) + '</td>'
+            + '<td>' + (m.passed || 0) + '</td>'
+            + '<td>' + (m.failed || 0) + '</td>'
+            + '<td>' + (m.skipped || 0) + '</td>'
+            + '<td>' + formatDuration(m.durationMillis || 0) + '</td>'
+            + '<td class="' + (slaRate >= 90 ? 'sla-pass' : 'sla-fail') + '">' + slaRate + '%</td>'
+            + '<td class="' + (successRate >= slaRate ? 'sla-pass' : 'sla-fail') + '">' + successRate + '%</td>'
+            + '</tr>';
+    }).join('');
+
+    // Attach click handlers after rows are in the DOM (avoids all inline-JS quoting issues)
+    document.querySelectorAll('.module-summary-row').forEach(function(row) {
+        row.addEventListener('click', function() {
+            showDetailedReport(this.getAttribute('data-filter-module'));
+        });
+    });
+}
+
+/* ===== Floating tooltip for Last 7 circles =====
+   Lives at body level so it is never clipped by .table-container's overflow.
+   Uses document-level event delegation so it works for dynamically rendered rows. */
+(function() {
+    var tip = document.getElementById('miniTooltip');
+    if (!tip) return;
+
+    function positionTip(target) {
+        var rect = target.getBoundingClientRect();
+        var tipRect = tip.getBoundingClientRect();
+        var left = rect.left + (rect.width / 2) - (tipRect.width / 2);
+        var top = rect.top - tipRect.height - 10;
+        var margin = 6;
+        if (left < margin) left = margin;
+        if (left + tipRect.width > window.innerWidth - margin) {
+            left = window.innerWidth - tipRect.width - margin;
+        }
+        if (top < margin) {
+            // not enough room above — show below
+            top = rect.bottom + 10;
+        }
+        tip.style.left = left + 'px';
+        tip.style.top = top + 'px';
+    }
+
+    document.addEventListener('mouseover', function(e) {
+        var el = e.target;
+        if (!el || !el.classList || !el.classList.contains('mini-circle')) return;
+        var text = el.getAttribute('data-tooltip');
+        if (!text) return;
+        tip.textContent = text;
+        tip.style.left = '-9999px';
+        tip.style.top = '-9999px';
+        tip.classList.add('show');
+        // Position after the browser has laid out the tooltip with its new text.
+        requestAnimationFrame(function() { positionTip(el); });
+    });
+
+    document.addEventListener('mouseout', function(e) {
+        var el = e.target;
+        if (!el || !el.classList || !el.classList.contains('mini-circle')) return;
+        tip.classList.remove('show');
+    });
+
+    window.addEventListener('scroll', function() {
+        tip.classList.remove('show');
+    }, true);
+})();
+
+/* ===== Lightbox (screenshot + video) ===== */
+document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('screenshot')) {
+        var modal = document.getElementById('lightboxModal');
+        var modalImg = document.getElementById('lightboxImage');
+        var modalVideo = document.getElementById('lightboxVideo');
+        if (modal && modalImg && modalVideo) {
+            modalVideo.style.display = 'none';
+            modalVideo.pause();
+            modalVideo.src = '';
+            modalImg.src = e.target.src;
+            modalImg.style.display = 'block';
+            modal.style.display = 'block';
+        }
+    }
+    if (e.target.id === 'closeModal' || e.target.classList.contains('modal')) {
+        var modal = document.getElementById('lightboxModal');
+        var modalVideo = document.getElementById('lightboxVideo');
+        if (modalVideo) { modalVideo.pause(); modalVideo.src = ''; }
+        if (modal) { modal.style.display = 'none'; }
+    }
+});
+</script>
+</body>
+</html>
