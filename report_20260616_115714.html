@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Automation Test Summary Report</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+body { font-family: 'Segoe UI', sans-serif; background:#f8f9fb; margin:0; color:#333; }
+.header { display:flex; justify-content:space-between; align-items:center; background:linear-gradient(33deg,#8db5f1,#021e49); color:white; padding:10px 20px; }
+.header img { height:40px; }
+.summary-band { background:#0e4494; color:white; display:flex; justify-content:center; gap:30px; padding:8px; font-weight:600; }
+.summary-band div { display:flex; align-items:center; gap:5px; }
+.main { display:flex; gap:20px; padding:20px; }
+.chart-container { flex:1; display:flex; justify-content:center; align-items:center; }
+.table-container { flex:1; background:white; padding:15px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.1); overflow-x: auto; box-sizing: border-box; }
+.table-container table { width:100%; border-collapse:collapse; }
+.table-container th, .table-container td { padding:8px; border-bottom:1px solid #eee; text-align:left; }
+.table-container th { background:#002b6b; color:white; }
+.footer { text-align:center; font-size:0.8em; padding:10px; background:#f1f1f1; margin-top:20px; }
+
+.detailed-section { display: none; }
+#smartui-section, #performance-section { display: none; }
+
+.step-table { width:95%; margin:10px auto; border-collapse:collapse; font-size:0.85em; table-layout: fixed; }
+.step-table th, .step-table td { border:1px solid #ccc; padding:8px; text-align:left; word-wrap: break-word; overflow-wrap: break-word; }
+.step-table th { background:#f1f1f1; color:black; }
+.step-table td:nth-child(1), .step-table th:nth-child(1) { width: 30%; }
+.step-table td:nth-child(2), .step-table th:nth-child(2) { width: 25%; }
+.step-table td:nth-child(3), .step-table th:nth-child(3) { width: 25%; }
+.step-table td:nth-child(4), .step-table th:nth-child(4) { width: 10%; text-align:center; }
+.step-table td:nth-child(5), .step-table th:nth-child(5) { width: 10%; text-align:center; }
+.screenshot { max-width:80px; max-height:80px; object-fit: cover; cursor:pointer; border: 1px solid #ccc; border-radius: 4px; }
+.environment-ribbon { background:#f4f6f8; padding:10px; font-size:0.9em; border-bottom:1px solid #ddd; display:flex; justify-content:space-around; }
+.toolbar input, .toolbar select, .toolbar button { padding:6px 10px; border-radius:5px; border:1px solid #ccc; }
+.toolbar button { background:#007bff; color:white; border:none; cursor:pointer; }
+
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 9999;
+  padding-top: 60px;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0,0,0,0.9);
+}
+.modal-content {
+  display: block;
+  margin: auto;
+  max-width: 80%;
+  max-height: 80%;
+}
+video.modal-content {
+  width: 80%;
+  background: black;
+}
+#closeModal {
+  position: absolute;
+  top: 20px;
+  right: 35px;
+  color: #fff;
+  font-size: 30px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+table tr[onclick]:hover {
+  background-color: #f0f8ff !important;
+  transition: background-color 0.3s ease;
+}
+.chart-container canvas { max-width: 300px !important; max-height: 300px !important; }
+
+.detailed-report-link { text-align:right; padding:10px; display: block; }
+.detailed-report-link a { color: #0052cc; text-decoration: none; font-weight: 600; cursor: pointer; padding-right: 47px; }
+.detailed-report-link a:hover { text-decoration: underline; }
+
+.back-btn { background: white; color: blue; padding: 8px 15px; border-radius: 5px; text-decoration: none; box-shadow: 0 2px 10px rgba(0,0,0,0.2); display:inline-block; margin:20px 0; cursor: pointer; }
+.status-pass { color: #28a745; font-weight: bold; }
+.status-fail { color: #dc3545; font-weight: bold; }
+.status-skipped { color: #ffc107; font-weight: bold; }
+.sla-pass { color: #28a745; font-weight: bold; }
+.sla-fail { color: #dc3545; font-weight: bold; }
+</style>
+</head>
+<body>
+<div id="summary-section">
+    <div class="header">
+    <img alt="Company Logo" src="https://www.resulticks.com/images/logos/resulticks-logo-blue.svg"/>
+    <h2>Automation Test Summary Report</h2>
+    <img alt="Product Logo" src="https://run19.resul.io/assets/resulticks-logo-white-391eec89.svg"/>
+    </div>
+    <div class="summary-band">
+  <div>📊 Total: 1</div>
+<div>✅ Passed: 0</div>
+<div>❌ Failed: 1</div>
+<div>⚠️ Skipped: 0</div>
+ <div>⏱️ Duration: 00:03:10</div>
+<div>🎯 SLA: 90%</div>
+<div>🎯 Pass Rate: 0.00%</div>
+    </div>
+    <div class="detailed-report-link">
+    <a onclick="showDetailedReport()">📑 Detailed Report</a>
+    </div>
+    <div class="main">
+    <div class="chart-container">
+        <canvas id="chart1"></canvas>
+    </div>
+    <div class="table-container">
+    <h3>Module-wise Results</h3>
+    <table>
+    <tr><th>Module</th><th>Total</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Duration</th><th>SLA %</th><th>Pass %</th></tr>
+    <tbody id="moduleTableBody"></tbody>
+    </table>
+    </div>
+    </div>
+    <div class="footer">Report generated on <span id="current-datetime">26-06-16 11:57:14</span> | Contact: <a href="mailto:qaautomation@resulticks.com">qaautomation@resulticks.com</a></div>
+</div>
+
+<div id="detailed-section" class="detailed-section" style="padding:20px; box-sizing:border-box;">
+    <div class="header"><img alt="Company Logo" src="https://www.resulticks.com/images/logos/resulticks-logo-blue.svg"/><h2>Detail Test Report</h2><img alt="Product Logo" src="https://run.resulticks.com/assets/resulticks-logo-white-391eec89.svg"/></div><div class="environment-ribbon"><span><strong>Environment:</strong> Run</span><span><strong>Browser:</strong> chrome</span><span><strong>Release:</strong> 5.0</span><span><strong>Execution Date:</strong> 26-06-16 11:57:14</span></div><div style="text-align:right; padding:10px;"><a class="back-btn" onclick="showSummaryReport()">⬅ Back to Summary Report</a></div><div class="table-container"><h3>Test Case Results</h3><div class="toolbar"><div style="display:flex; gap:15px; flex-wrap:wrap; margin:20px 0;"><div><label><b>Search:</b></label><input id="searchInput" placeholder="Search test cases..." type="text"/></div><div><label><b>Filter by Status:</b></label><select id="statusFilter"><option value="">All</option><option value="PASS">Passed</option><option value="FAIL">Failed</option><option value="SKIPPED">Skipped</option></select></div></div></div><table id="testcaseTable"><thead><tr><th></th><th>Module</th><th>Test Case ID</th><th>Description</th><th>Status</th><th>Duration</th><th>Video</th></tr></thead><tbody><tr data-test-id="tc1" data-status="FAIL" data-expanded="false" onclick="toggleDetails(this)"><td class="expand-icon">+</td><td>AI Generated Audience Segmentation</td><td>Create audience using AI generated CSV</td><td>Create audience using AI generated CSV</td><td class="status-fail">❌ Failed</td><td>172s</td><td><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/Create_audience_using_AI_generated_CSV_20260616062710399102_test_create_audience_using_ai_generated_csv_20260616115659.webm" onclick="playVideoHandler(event, this)">🎥 View</a></td></tr><tr class="details-row" id="tc1-details" style="display:none"><td colspan="7"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Set criteria: City-Shimla, Gender-Male, MaritalStatus-Single, Salary-&lt;25000</td><td>Criteria stored in context</td><td>Criteria set to: City-Shimla, Gender-Male, MaritalStatus-Single, Salary-&lt;25000</td><td>✅</td><td>-</td></tr><tr><td>Set audience count: 1000</td><td>Audience count stored in context</td><td>Audience count set to: 1000</td><td>✅</td><td>-</td></tr><tr><td>Set attribute count: 20</td><td>Attribute count stored in context</td><td>Attribute count set to: 20</td><td>✅</td><td>-</td></tr><tr><td>Generate audience schema and CSV data via AI</td><td>Audience CSV file generated successfully at C:\Users\VijayManoharan\Downloads\ResulPy-main\ResulPy-main\testdata\generated_audience_1781591050.csv</td><td>CSV file generated containing satisfying criteria rows</td><td>✅</td><td>-</td></tr><tr><td>Upload AI-generated CSV and save audience</td><td>Audience uploaded and saved successfully</td><td>Audience list &#39;TRGT 11543516062026AM3308&#39; saved successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/Create_audience_using_AI_generated_CSV_20260616062503879466_Create_audience_using_AI_generated_CSV_20260616115504251065.jpg"/></td></tr><tr><td>the user creates a segment using the provided criteria</td><td></td><td>Failed to apply segment filter for Salary Is less than 25000
+assert False</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/Create_audience_using_AI_generated_CSV_20260616062656741090_Create_audience_using_AI_generated_CSV_20260616115657379520.jpg"/></td></tr></table></td></tr></tbody></table></div>
+<script>
+function toggleDetails(row) {
+    const detailsRow = document.getElementById(row.getAttribute('data-test-id') + '-details');
+    const expandIcon = row.querySelector('.expand-icon');
+
+    if (detailsRow.style.display === 'none') {
+        detailsRow.style.display = 'table-row';
+        row.setAttribute('data-expanded', 'true');
+        expandIcon.innerHTML = '-';
+    } else {
+        detailsRow.style.display = 'none';
+        row.setAttribute('data-expanded', 'false');
+        expandIcon.innerHTML = '+';
+    }
+}
+
+function playVideoHandler(event, element) {
+    event.stopPropagation();
+    event.preventDefault();
+    const modal = document.getElementById('lightboxModal');
+    const modalImg = document.getElementById('lightboxImage');
+    const modalVideo = document.getElementById('lightboxVideo');
+    if (modal && modalImg && modalVideo) {
+        modalImg.style.display = 'none';
+        modalImg.src = '';
+        modalVideo.src = element.getAttribute('data-video');
+        modalVideo.style.display = 'block';
+        modal.style.display = 'block';
+        modalVideo.play();
+    }
+}
+
+function applySearchAndFilter() {
+  var searchText = document.getElementById('searchInput').value.toLowerCase().trim();
+  var filterValue = document.getElementById('statusFilter').value;
+  var mainRows = document.querySelectorAll('#testcaseTable > tbody > tr:not(.details-row)');
+  mainRows.forEach(function(row) {
+    var rowText = row.textContent.toLowerCase();
+    var rowStatus = row.getAttribute('data-status') || '';
+    var matchesSearch = !searchText || rowText.includes(searchText);
+    var matchesFilter = !filterValue || rowStatus === filterValue;
+    var shouldShow = matchesSearch && matchesFilter;
+    var testId = row.getAttribute('data-test-id');
+    var detailsRow = document.getElementById(testId + '-details');
+    if (shouldShow) {
+      row.style.display = '';
+      if (detailsRow) {
+        var expanded = row.getAttribute('data-expanded') === 'true';
+        detailsRow.style.display = expanded ? 'table-row' : 'none';
+      }
+    } else {
+      row.style.display = 'none';
+      if (detailsRow) detailsRow.style.display = 'none';
+      if (row.querySelector('.expand-icon')) {
+        row.querySelector('.expand-icon').textContent = '+';
+        row.setAttribute('data-expanded', 'false');
+      }
+    }
+  });
+}
+document.addEventListener('DOMContentLoaded', function() {
+  var searchInput = document.getElementById('searchInput');
+  var statusFilter = document.getElementById('statusFilter');
+  if (searchInput) searchInput.addEventListener('input', applySearchAndFilter);
+  if (statusFilter) statusFilter.addEventListener('change', applySearchAndFilter);
+});
+</script>
+        
+</div>
+
+<div class="modal" id="lightboxModal">
+    <span id="closeModal">✖</span>
+    <img class="modal-content" id="lightboxImage" style="display:none;"/>
+    <video class="modal-content" id="lightboxVideo" controls style="display:none;"></video>
+</div>
+
+<script>
+function showDetailedReport() {
+    document.getElementById("summary-section").style.display = "none";
+    document.getElementById("detailed-section").style.display = "block";
+    window.scrollTo(0,0);
+}
+function showSummaryReport() {
+    document.getElementById("detailed-section").style.display = "none";
+    document.getElementById("summary-section").style.display = "block";
+    window.scrollTo(0,0);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('chart1');
+    if (ctx) {
+        new Chart(ctx, {
+          type: 'doughnut',
+          data: { labels:['Passed','Failed','Skipped'], datasets:[{ data:[0,1,0], backgroundColor:['#28a745','#dc3545','#ffc107']}] },
+          options: { plugins:{ legend:{ position:'bottom'} } }
+        });
+    }
+});
+
+const moduleDataRaw = "[{\"module\": \"AI GENERATED AUDIENCE SEGMENTATION\", \"total\": 1, \"passed\": 0, \"failed\": 1, \"skipped\": 0, \"durationMillis\": 172460}]";
+let moduleData = [];
+try { moduleData = JSON.parse(moduleDataRaw); } catch (e) { console.error('Failed to parse module data:', e); }
+
+function formatDuration(ms) {
+    if (!ms || ms <= 0) return '-';
+    const totalSeconds = Math.floor(ms / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    const pad = (n) => n.toString().padStart(2, '0');
+    return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+}
+
+function populateModuleTable() {
+    const tableBody = document.getElementById('moduleTableBody');
+    if (!tableBody) return;
+
+    if (!moduleData || moduleData.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #666;">No module data available</td></tr>';
+        return;
+    }
+
+    tableBody.innerHTML = moduleData.map(m => {
+        const successRate = m.total > 0 ? ((m.passed/m.total)*100).toFixed(0) : '0';
+        const slaRate = 90;
+        return `<tr onclick="showDetailedReport(); setTimeout(() => { const el = document.getElementById('module-' + m.module.toLowerCase()); if (el) el.scrollIntoView({behavior:'smooth'}); }, 100);" style="cursor:pointer;">
+            <td>${m.module || 'Unknown Module'}</td>
+            <td>${m.total || 0}</td>
+            <td>${m.passed || 0}</td>
+            <td>${m.failed || 0}</td>
+            <td>${m.skipped || 0}</td>
+            <td>${formatDuration(m.durationMillis || 0)}</td>
+            <td class="${slaRate >= 90 ? 'sla-pass' : 'sla-fail'}">${slaRate}%</td>
+            <td class="${successRate >= slaRate ? 'sla-pass' : 'sla-fail'}">${successRate}%</td>
+        </tr>`;
+    }).join('');
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    showSummaryReport();
+    populateModuleTable();
+});
+
+document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('screenshot')) {
+        const modal = document.getElementById('lightboxModal');
+        const modalImg = document.getElementById('lightboxImage');
+        const modalVideo = document.getElementById('lightboxVideo');
+        if (modal && modalImg && modalVideo) {
+            modalVideo.style.display = 'none';
+            modalVideo.pause();
+            modalVideo.src = '';
+            modalImg.src = e.target.src;
+            modalImg.style.display = 'block';
+            modal.style.display = 'block';
+        }
+    }
+
+    if (e.target.id === 'closeModal' || e.target.classList.contains('modal')) {
+        const modal = document.getElementById('lightboxModal');
+        const modalVideo = document.getElementById('lightboxVideo');
+        if (modalVideo) {
+            modalVideo.pause();
+            modalVideo.src = '';
+        }
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    }
+});
+</script>
+</body>
+</html>
