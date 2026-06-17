@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Automation Test Summary Report</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+body { font-family: 'Segoe UI', sans-serif; background:#f8f9fb; margin:0; color:#333; }
+.header { display:flex; justify-content:space-between; align-items:center; background:linear-gradient(33deg,#8db5f1,#021e49); color:white; padding:10px 20px; }
+.header img { height:40px; }
+.summary-band { background:#0e4494; color:white; display:flex; justify-content:center; gap:30px; padding:8px; font-weight:600; }
+.summary-band div { display:flex; align-items:center; gap:5px; }
+.main { display:flex; gap:20px; padding:20px; }
+.chart-container { flex:1; display:flex; justify-content:center; align-items:center; }
+.table-container { flex:1; background:white; padding:15px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.1); overflow-x: auto; box-sizing: border-box; }
+.table-container table { width:100%; border-collapse:collapse; }
+.table-container th, .table-container td { padding:8px; border-bottom:1px solid #eee; text-align:left; }
+.table-container th { background:#002b6b; color:white; }
+.footer { text-align:center; font-size:0.8em; padding:10px; background:#f1f1f1; margin-top:20px; }
+
+.detailed-section { display: none; }
+#smartui-section, #performance-section { display: none; }
+
+.step-table { width:95%; margin:10px auto; border-collapse:collapse; font-size:0.85em; table-layout: fixed; }
+.step-table th, .step-table td { border:1px solid #ccc; padding:8px; text-align:left; word-wrap: break-word; overflow-wrap: break-word; }
+.step-table th { background:#f1f1f1; color:black; }
+.step-table td:nth-child(1), .step-table th:nth-child(1) { width: 30%; }
+.step-table td:nth-child(2), .step-table th:nth-child(2) { width: 25%; }
+.step-table td:nth-child(3), .step-table th:nth-child(3) { width: 25%; }
+.step-table td:nth-child(4), .step-table th:nth-child(4) { width: 10%; text-align:center; }
+.step-table td:nth-child(5), .step-table th:nth-child(5) { width: 10%; text-align:center; }
+.screenshot { max-width:80px; max-height:80px; object-fit: cover; cursor:pointer; border: 1px solid #ccc; border-radius: 4px; }
+.environment-ribbon { background:#f4f6f8; padding:10px; font-size:0.9em; border-bottom:1px solid #ddd; display:flex; justify-content:space-around; }
+.toolbar input, .toolbar select, .toolbar button { padding:6px 10px; border-radius:5px; border:1px solid #ccc; }
+.toolbar button { background:#007bff; color:white; border:none; cursor:pointer; }
+
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 9999;
+  padding-top: 60px;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0,0,0,0.9);
+}
+.modal-content {
+  display: block;
+  margin: auto;
+  max-width: 80%;
+  max-height: 80%;
+}
+video.modal-content {
+  width: 80%;
+  background: black;
+}
+#closeModal {
+  position: absolute;
+  top: 20px;
+  right: 35px;
+  color: #fff;
+  font-size: 30px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+table tr[onclick]:hover {
+  background-color: #f0f8ff !important;
+  transition: background-color 0.3s ease;
+}
+.chart-container canvas { max-width: 300px !important; max-height: 300px !important; }
+
+.detailed-report-link { text-align:right; padding:10px; display: block; }
+.detailed-report-link a { color: #0052cc; text-decoration: none; font-weight: 600; cursor: pointer; padding-right: 47px; }
+.detailed-report-link a:hover { text-decoration: underline; }
+
+.back-btn { background: white; color: blue; padding: 8px 15px; border-radius: 5px; text-decoration: none; box-shadow: 0 2px 10px rgba(0,0,0,0.2); display:inline-block; margin:20px 0; cursor: pointer; }
+.status-pass { color: #28a745; font-weight: bold; }
+.status-fail { color: #dc3545; font-weight: bold; }
+.status-skipped { color: #ffc107; font-weight: bold; }
+.sla-pass { color: #28a745; font-weight: bold; }
+.sla-fail { color: #dc3545; font-weight: bold; }
+</style>
+</head>
+<body>
+<div id="summary-section">
+    <div class="header">
+    <img alt="Company Logo" src="https://www.resulticks.com/images/logos/resulticks-logo-blue.svg"/>
+    <h2>Automation Test Summary Report</h2>
+    <img alt="Product Logo" src="https://run19.resul.io/assets/resulticks-logo-white-391eec89.svg"/>
+    </div>
+    <div class="summary-band">
+  <div>📊 Total: 1</div>
+<div>✅ Passed: 0</div>
+<div>❌ Failed: 1</div>
+<div>⚠️ Skipped: 0</div>
+ <div>⏱️ Duration: 00:11:03</div>
+<div>🎯 SLA: 90%</div>
+<div>🎯 Pass Rate: 0.00%</div>
+    </div>
+    <div class="detailed-report-link">
+    <a onclick="showDetailedReport()">📑 Detailed Report</a>
+    </div>
+    <div class="main">
+    <div class="chart-container">
+        <canvas id="chart1"></canvas>
+    </div>
+    <div class="table-container">
+    <h3>Module-wise Results</h3>
+    <table>
+    <tr><th>Module</th><th>Total</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Duration</th><th>SLA %</th><th>Pass %</th></tr>
+    <tbody id="moduleTableBody"></tbody>
+    </table>
+    </div>
+    </div>
+    <div class="footer">Report generated on <span id="current-datetime">26-06-17 20:23:50</span> | Contact: <a href="mailto:qaautomation@resulticks.com">qaautomation@resulticks.com</a></div>
+</div>
+
+<div id="detailed-section" class="detailed-section" style="padding:20px; box-sizing:border-box;">
+    <div class="header"><img alt="Company Logo" src="https://www.resulticks.com/images/logos/resulticks-logo-blue.svg"/><h2>Detail Test Report</h2><img alt="Product Logo" src="https://run.resulticks.com/assets/resulticks-logo-white-391eec89.svg"/></div><div class="environment-ribbon"><span><strong>Environment:</strong> run</span><span><strong>Browser:</strong> chrome</span><span><strong>Release:</strong> 5.0</span><span><strong>Execution Date:</strong> 26-06-17 20:23:50</span></div><div style="text-align:right; padding:10px;"><a class="back-btn" onclick="showSummaryReport()">⬅ Back to Summary Report</a></div><div class="table-container"><h3>Test Case Results</h3><div class="toolbar"><div style="display:flex; gap:15px; flex-wrap:wrap; margin:20px 0;"><div><label><b>Search:</b></label><input id="searchInput" placeholder="Search test cases..." type="text"/></div><div><label><b>Filter by Status:</b></label><select id="statusFilter"><option value="">All</option><option value="PASS">Passed</option><option value="FAIL">Failed</option><option value="SKIPPED">Skipped</option></select></div></div></div><table id="testcaseTable"><thead><tr><th></th><th>Module</th><th>Test Case ID</th><th>Description</th><th>Status</th><th>Duration</th><th>Video</th></tr></thead><tbody><tr data-test-id="tc1" data-status="FAIL" data-expanded="false" onclick="toggleDetails(this)"><td class="expand-icon">+</td><td>AUDIENCE</td><td>RS-T1697</td><td>Validate newly created attribute appears disabled and then enabled in target list creation</td><td class="status-fail">❌ Failed</td><td>597s</td><td><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T1697_20260617145346491220_test_validate_newly_created_attribute_appears_disabled_and_then_enabled_in_target_list_creation_20260617202254.webm" onclick="playVideoHandler(event, this)">🎥 View</a></td></tr><tr class="details-row" id="tc1-details" style="display:none"><td colspan="7"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User successfully logged in.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1697_20260617144320789274_RS-T1697_20260617201320431557.jpg"/></td></tr><tr><td>Navigate to Preference module</td><td>Preference module opens successfully</td><td>Preference module opened successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1697_20260617144321723562_RS-T1697_20260617201322037950.jpg"/></td></tr><tr><td>Click on &#39;Data catalog&#39; sub-module</td><td>&#39;Data catalog&#39; sub-module should be opened successfully</td><td>&#39;Data catalog&#39; sub-module opened successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1697_20260617144322652492_RS-T1697_20260617201322967298.jpg"/></td></tr><tr><td>Verify access to &#39;Data catalog&#39; page</td><td>User should be able to access &#39;Data catalog&#39; page successfully</td><td>&#39;Data catalog&#39; page accessed successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1697_20260617144325830299_RS-T1697_20260617201326033482.jpg"/></td></tr><tr><td>Click Create Attribute</td><td>Create Attribute button should be clickable</td><td>Create Attribute clicked successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1697_20260617144330261425_RS-T1697_20260617201330658908.jpg"/></td></tr><tr><td>Create new attribute</td><td>New attribute should be created successfully</td><td>Attribute created successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1697_20260617144350241701_RS-T1697_20260617201350665516.jpg"/></td></tr><tr><td>Confirm attribute creation popup</td><td>Popup should be confirmed</td><td>Popup confirmed successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1697_20260617144352063914_RS-T1697_20260617201352085034.jpg"/></td></tr><tr><td>Search and validate newly created attribute</td><td>Newly created attribute &#39;Newattribute081331_17062026_PM_9372&#39; should be found</td><td>Attribute not found</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1697_20260617144355643208_RS-T1697_20260617201356085133.jpg"/></td></tr><tr><td>Click the master data management page</td><td>User should navigate to the master data management page</td><td>User navigate to the master data management page successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1697_20260617144403740210_RS-T1697_20260617201403870861.jpg"/></td></tr><tr><td>Click the add audience page</td><td>User should navigate to the add audience page</td><td>User navigate to the add audience page successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1697_20260617144410664323_RS-T1697_20260617201411214757.jpg"/></td></tr><tr><td>Select the import source</td><td>User should select the import source as CSV</td><td>User select the import source successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1697_20260617144411857652_RS-T1697_20260617201412292805.jpg"/></td></tr><tr><td>Select the list type</td><td>User should select the list type as Target list</td><td>User select the list type successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1697_20260617144412999254_RS-T1697_20260617201413400724.jpg"/></td></tr><tr><td>Select the attribute mapping field</td><td>Attribute mapping value should able to select</td><td>Attribute mapping value is selected successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1697_20260617144414013001_RS-T1697_20260617201414426425.jpg"/></td></tr><tr><td>Enter the list name</td><td>List name should able to enter</td><td>List name is entered successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1697_20260617144415027648_RS-T1697_20260617201415497911.jpg"/></td></tr><tr><td>Upload the CSV file</td><td>CSV file should able to uploaded</td><td>CSV file is uploaded successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1697_20260617144418752007_RS-T1697_20260617201419182259.jpg"/></td></tr><tr><td>Click on Upload button</td><td>Upload button should able to click</td><td>Upload button is clicked successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1697_20260617144421666466_RS-T1697_20260617201422143899.jpg"/></td></tr><tr><td>Attribute should be mapped if not</td><td>Attribute should be mapped if not</td><td>Attribute mapped successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1697_20260617144425506592_RS-T1697_20260617201425844623.jpg"/></td></tr><tr><td>Click the double-opt checkbox</td><td>double-opt checkbox should able to click</td><td>double-opt checkbox is clicked successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1697_20260617144426264066_RS-T1697_20260617201426607226.jpg"/></td></tr><tr><td>Click the save button</td><td>Save button should be clickable</td><td>Save button is clicked successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1697_20260617144428865768_RS-T1697_20260617201429286221.jpg"/></td></tr><tr><td>Verify the Return to MDM popup help text</td><td>Return to MDM popup help text should be present as expected</td><td>Return to MDM popup is present as expected</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1697_20260617144429746285_RS-T1697_20260617201429786327.jpg"/></td></tr><tr><td>Click the return to master data management button</td><td>Page should navigate to MDM page</td><td>Page is navigated to MDM page</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1697_20260617144430568032_RS-T1697_20260617201430916780.jpg"/></td></tr><tr><td>Click the sync history icon</td><td>Page should navigate to Sync history page</td><td>Page is navigated to Sync history page</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1697_20260617144439364342_RS-T1697_20260617201439829838.jpg"/></td></tr><tr><td>Wait for upload completion</td><td>Uploaded completion should be present as expected</td><td>Uploaded completion is present as expected</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1697_20260617144606865288_RS-T1697_20260617201607326616.jpg"/></td></tr><tr><td>Verify the import description</td><td>Import description should be present as expected</td><td>Import description is not present as expected</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1697_20260617144611510522_RS-T1697_20260617201611821692.jpg"/></td></tr><tr><td>Navigate to Target listing page</td><td>User should navigate to Target listing page</td><td>User navigated to Target listing page successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1697_20260617145114056919_RS-T1697_20260617202114502941.jpg"/></td></tr><tr><td>Select New List Segment</td><td>New List Segment option should be selected</td><td>New List Segment selected successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1697_20260617145115106869_RS-T1697_20260617202115604534.jpg"/></td></tr><tr><td>Check list name placeholder</td><td>Placeholder should be displayed</td><td>Placeholder displayed successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1697_20260617145118290339_RS-T1697_20260617202118404699.jpg"/></td></tr><tr><td>Enter target list name</td><td>Target list name should be entered</td><td>Target list name entered successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1697_20260617145120809368_RS-T1697_20260617202120204421.jpg"/></td></tr><tr><td>Verify green tick indicator</td><td>Green tick should appear for valid list name</td><td>Green tick displayed successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1697_20260617145123841195_RS-T1697_20260617202123079836.jpg"/></td></tr><tr><td>Search for created attribute in target list page</td><td>Attribute &#39;Newattribute081331_17062026_PM_9372&#39; should be found</td><td>Attribute found successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1697_20260617145125653105_RS-T1697_20260617202125856063.jpg"/></td></tr><tr><td>Verify attribute disabled in segmentation</td><td>Attribute &#39;Newattribute081331_17062026_PM_9372&#39; should be disabled</td><td>Attribute is not disabled</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1697_20260617145126139123_RS-T1697_20260617202126670621.jpg"/></td></tr><tr><td>User selects attribute mapping fields</td><td></td><td>Locator.click: Timeout 30000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1697_20260617145253080559_RS-T1697_20260617202253465010.jpg"/></td></tr></table></td></tr></tbody></table></div>
+<script>
+function toggleDetails(row) {
+    const detailsRow = document.getElementById(row.getAttribute('data-test-id') + '-details');
+    const expandIcon = row.querySelector('.expand-icon');
+
+    if (detailsRow.style.display === 'none') {
+        detailsRow.style.display = 'table-row';
+        row.setAttribute('data-expanded', 'true');
+        expandIcon.innerHTML = '-';
+    } else {
+        detailsRow.style.display = 'none';
+        row.setAttribute('data-expanded', 'false');
+        expandIcon.innerHTML = '+';
+    }
+}
+
+function playVideoHandler(event, element) {
+    event.stopPropagation();
+    event.preventDefault();
+    const modal = document.getElementById('lightboxModal');
+    const modalImg = document.getElementById('lightboxImage');
+    const modalVideo = document.getElementById('lightboxVideo');
+    if (modal && modalImg && modalVideo) {
+        modalImg.style.display = 'none';
+        modalImg.src = '';
+        modalVideo.src = element.getAttribute('data-video');
+        modalVideo.style.display = 'block';
+        modal.style.display = 'block';
+        modalVideo.play();
+    }
+}
+
+function applySearchAndFilter() {
+  var searchText = document.getElementById('searchInput').value.toLowerCase().trim();
+  var filterValue = document.getElementById('statusFilter').value;
+  var mainRows = document.querySelectorAll('#testcaseTable > tbody > tr:not(.details-row)');
+  mainRows.forEach(function(row) {
+    var rowText = row.textContent.toLowerCase();
+    var rowStatus = row.getAttribute('data-status') || '';
+    var matchesSearch = !searchText || rowText.includes(searchText);
+    var matchesFilter = !filterValue || rowStatus === filterValue;
+    var shouldShow = matchesSearch && matchesFilter;
+    var testId = row.getAttribute('data-test-id');
+    var detailsRow = document.getElementById(testId + '-details');
+    if (shouldShow) {
+      row.style.display = '';
+      if (detailsRow) {
+        var expanded = row.getAttribute('data-expanded') === 'true';
+        detailsRow.style.display = expanded ? 'table-row' : 'none';
+      }
+    } else {
+      row.style.display = 'none';
+      if (detailsRow) detailsRow.style.display = 'none';
+      if (row.querySelector('.expand-icon')) {
+        row.querySelector('.expand-icon').textContent = '+';
+        row.setAttribute('data-expanded', 'false');
+      }
+    }
+  });
+}
+document.addEventListener('DOMContentLoaded', function() {
+  var searchInput = document.getElementById('searchInput');
+  var statusFilter = document.getElementById('statusFilter');
+  if (searchInput) searchInput.addEventListener('input', applySearchAndFilter);
+  if (statusFilter) statusFilter.addEventListener('change', applySearchAndFilter);
+});
+</script>
+        
+</div>
+
+<div class="modal" id="lightboxModal">
+    <span id="closeModal">✖</span>
+    <img class="modal-content" id="lightboxImage" style="display:none;"/>
+    <video class="modal-content" id="lightboxVideo" controls style="display:none;"></video>
+</div>
+
+<script>
+function showDetailedReport() {
+    document.getElementById("summary-section").style.display = "none";
+    document.getElementById("detailed-section").style.display = "block";
+    window.scrollTo(0,0);
+}
+function showSummaryReport() {
+    document.getElementById("detailed-section").style.display = "none";
+    document.getElementById("summary-section").style.display = "block";
+    window.scrollTo(0,0);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('chart1');
+    if (ctx) {
+        new Chart(ctx, {
+          type: 'doughnut',
+          data: { labels:['Passed','Failed','Skipped'], datasets:[{ data:[0,1,0], backgroundColor:['#28a745','#dc3545','#ffc107']}] },
+          options: { plugins:{ legend:{ position:'bottom'} } }
+        });
+    }
+});
+
+const moduleDataRaw = "[{\"module\": \"AUDIENCE\", \"total\": 1, \"passed\": 0, \"failed\": 1, \"skipped\": 0, \"durationMillis\": 597169}]";
+let moduleData = [];
+try { moduleData = JSON.parse(moduleDataRaw); } catch (e) { console.error('Failed to parse module data:', e); }
+
+function formatDuration(ms) {
+    if (!ms || ms <= 0) return '-';
+    const totalSeconds = Math.floor(ms / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    const pad = (n) => n.toString().padStart(2, '0');
+    return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+}
+
+function populateModuleTable() {
+    const tableBody = document.getElementById('moduleTableBody');
+    if (!tableBody) return;
+
+    if (!moduleData || moduleData.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #666;">No module data available</td></tr>';
+        return;
+    }
+
+    tableBody.innerHTML = moduleData.map(m => {
+        const successRate = m.total > 0 ? ((m.passed/m.total)*100).toFixed(0) : '0';
+        const slaRate = 90;
+        return `<tr onclick="showDetailedReport(); setTimeout(() => { const el = document.getElementById('module-' + m.module.toLowerCase()); if (el) el.scrollIntoView({behavior:'smooth'}); }, 100);" style="cursor:pointer;">
+            <td>${m.module || 'Unknown Module'}</td>
+            <td>${m.total || 0}</td>
+            <td>${m.passed || 0}</td>
+            <td>${m.failed || 0}</td>
+            <td>${m.skipped || 0}</td>
+            <td>${formatDuration(m.durationMillis || 0)}</td>
+            <td class="${slaRate >= 90 ? 'sla-pass' : 'sla-fail'}">${slaRate}%</td>
+            <td class="${successRate >= slaRate ? 'sla-pass' : 'sla-fail'}">${successRate}%</td>
+        </tr>`;
+    }).join('');
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    showSummaryReport();
+    populateModuleTable();
+});
+
+document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('screenshot')) {
+        const modal = document.getElementById('lightboxModal');
+        const modalImg = document.getElementById('lightboxImage');
+        const modalVideo = document.getElementById('lightboxVideo');
+        if (modal && modalImg && modalVideo) {
+            modalVideo.style.display = 'none';
+            modalVideo.pause();
+            modalVideo.src = '';
+            modalImg.src = e.target.src;
+            modalImg.style.display = 'block';
+            modal.style.display = 'block';
+        }
+    }
+
+    if (e.target.id === 'closeModal' || e.target.classList.contains('modal')) {
+        const modal = document.getElementById('lightboxModal');
+        const modalVideo = document.getElementById('lightboxVideo');
+        if (modalVideo) {
+            modalVideo.pause();
+            modalVideo.src = '';
+        }
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    }
+});
+</script>
+</body>
+</html>
