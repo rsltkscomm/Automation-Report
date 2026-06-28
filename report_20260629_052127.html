@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Automation Test Summary Report</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+/* ===== Last 7 inline circles (replaces the old History popup) ===== */
+.last7-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    width: 100%;
+}
+.mini-circle {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    color: #fff;
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 13px;
+    line-height: 1;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.18);
+    cursor: default;
+    transition: transform 0.15s ease;
+}
+.mini-circle:hover {
+    transform: scale(1.2);
+    z-index: 20;
+}
+.mini-pass { background: linear-gradient(135deg, #22c55e, #16a34a); }
+.mini-fail { background: linear-gradient(135deg, #ef4444, #dc2626); }
+.mini-skip { background: linear-gradient(135deg, #fbbf24, #f59e0b); }
+
+.th-last7 { text-align: center !important; }
+.td-last7 {
+    white-space: nowrap;
+    text-align: center;
+    overflow: visible !important;
+    padding: 8px 4px !important;
+    display: table-cell;
+    vertical-align: middle;
+}
+.last7-row {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 4px;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+}
+
+/* Floating tooltip lives in <body> so it can't be clipped by .table-container overflow */
+#miniTooltip {
+    position: fixed;
+    background: #1e293b;
+    color: #fff;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-family: 'Segoe UI', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.1px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-width: 280px;
+    text-align: center;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    z-index: 99999;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+    line-height: 1.45;
+}
+#miniTooltip.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+#miniTooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 7px solid transparent;
+    border-top-color: #1e293b;
+}
+
+/* ===== General Layout ===== */
+body { font-family: 'Segoe UI', sans-serif; background:#f0f4fa; margin:0; color:#333; }
+.header { display:flex; justify-content:space-between; align-items:center; background:linear-gradient(33deg,#8db5f1,#021e49); color:white; padding:10px 20px; }
+.header img { height:40px; }
+.summary-band { background:#0e4494; color:white; display:flex; justify-content:center; gap:30px; padding:8px; font-weight:600; flex-wrap:wrap; }
+.summary-band div { display:flex; align-items:center; gap:5px; }
+.main { display:flex; gap:20px; padding:20px; flex-wrap:wrap; }
+.chart-container { flex:1; display:flex; justify-content:center; align-items:center; min-width:250px; }
+.table-container { flex:1; background:white; padding:15px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.1); overflow-x:hidden; box-sizing:border-box; min-width:300px; width:100%; }
+.table-container table { width:100%; border-collapse:collapse; }
+.table-container th, .table-container td { padding:8px; border-bottom:1px solid #eee; text-align:left; }
+.table-container th { background:#002b6b; color:white; }
+.table-container tbody tr { transition: background 0.15s; cursor: pointer; }
+.table-container tbody tr:hover { background: #eaf2ff !important; box-shadow: inset 3px 0 0 #1a6fd4; }
+.footer { text-align:center; font-size:0.8em; padding:10px; background:#f1f1f1; margin-top:20px; }
+.detailed-section { display: none; }
+
+/* ===== Detail Table ===== */
+#testcaseTable {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 1em;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 16px rgba(14,68,148,0.10);
+}
+#testcaseTable thead tr {
+    background: linear-gradient(90deg, #0e4494 0%, #1a6fd4 100%);
+}
+#testcaseTable thead th {
+    color: #fff;
+    font-weight: 700;
+    padding: 14px 10px;
+    text-align: left;
+    font-size: 0.88em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border: none;
+    white-space: nowrap;
+}
+#testcaseTable thead th.th-expand { width: 40px; text-align: center; }
+#testcaseTable tbody tr:not(.details-row) {
+    background: #fff;
+    transition: background 0.18s;
+    cursor: pointer;
+}
+#testcaseTable tbody tr:not(.details-row):nth-child(even) {
+    background: #f7f9fd;
+}
+#testcaseTable tbody tr:not(.details-row):hover {
+    background: #eaf2ff !important;
+}
+#testcaseTable tbody td {
+    padding: 12px 10px;
+    border-bottom: 1px solid #e8eef5;
+    vertical-align: middle;
+}
+.td-module { font-weight: 600; color: #1e293b; font-size: 0.98em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.td-tcid { font-family: 'Courier New', monospace; font-size: 0.94em; color: #2563eb; font-weight: 700; letter-spacing: 0.3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.td-desc { vertical-align: middle; }
+/* table-layout:fixed keeps each column at its assigned width.
+   The description cell wraps text inside its column so the row height is
+   driven only by the content of that run, not by neighbouring cells growing. */
+#testcaseTable tbody tr:not(.details-row) td {
+    box-sizing: border-box;
+    vertical-align: middle;
+}
+/* Only clip module and tcid columns — never the Last 7 column */
+#testcaseTable tbody td.td-module,
+#testcaseTable tbody td.td-tcid {
+    overflow: hidden;
+}
+.desc-chip {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    background: linear-gradient(90deg, #eff6ff, #e0ecff);
+    color: #1e40af;
+    border: 1px solid #bfdbfe;
+    border-radius: 6px;
+    padding: 7px 12px;
+    font-size: 0.91em;
+    font-weight: 600;
+    letter-spacing: 0.1px;
+    white-space: normal;
+    word-break: break-word;
+    overflow: hidden;
+    line-height: 1.5;
+    vertical-align: middle;
+    box-sizing: border-box;
+    width: 100%;
+    max-height: calc(2 * 1.5em + 14px);
+}
+.td-date { font-size: 0.92em; color: #475569; font-weight: 500; white-space: nowrap; }
+.td-dur { font-size: 0.91em; color: #64748b; white-space: nowrap; text-align: center; }
+
+/* ===== Status Badges ===== */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 14px;
+    border-radius: 20px;
+    font-size: 0.88em;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    white-space: nowrap;
+}
+.badge-pass { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+.badge-fail { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+.badge-skip { background: #fef9c3; color: #92400e; border: 1px solid #fde68a; }
+
+/* ===== Expand Chevron ===== */
+.expand-icon { text-align: center; width: 36px; }
+.chevron {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: #f1f5f9;
+    color: #666;
+    font-size: 10px;
+    transition: all 0.2s ease;
+    border: 1px solid #e2e8f0;
+}
+#testcaseTable tbody tr:hover .chevron {
+    background: #dbeafe;
+    color: #1d4ed8;
+    border-color: #93c5fd;
+}
+
+/* ===== Video Button ===== */
+.video-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: linear-gradient(90deg, #0e4494, #2563eb);
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 0.9em;
+    font-weight: 600;
+    text-decoration: none;
+    transition: opacity 0.15s, transform 0.15s;
+    box-shadow: 0 2px 6px rgba(14,68,148,0.25);
+}
+.video-btn:hover { opacity: 0.92; transform: translateY(-1px); }
+.video-btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px; height: 16px;
+    background: rgba(255,255,255,0.22);
+    border-radius: 50%;
+    font-size: 9px;
+    padding-left: 2px;
+    line-height: 1;
+}
+
+/* ===== Step Table ===== */
+.step-table { width:95%; margin:10px auto; border-collapse:collapse; font-size:0.85em; table-layout:fixed; border-radius:8px; overflow:hidden; }
+.step-table th, .step-table td { border:1px solid #e2e8f0; padding:9px 10px; text-align:left; word-wrap:break-word; overflow-wrap:break-word; }
+.step-table th { background: linear-gradient(90deg,#1e293b,#334155); color:#fff; font-size:0.82em; text-transform:uppercase; letter-spacing:0.5px; }
+.step-table tbody tr { transition: background 0.15s; }
+.step-table tbody tr:hover { background: #eaf2ff !important; }
+.step-table td:nth-child(1), .step-table th:nth-child(1) { width:30%; }
+.step-table td:nth-child(2), .step-table th:nth-child(2) { width:25%; }
+.step-table td:nth-child(3), .step-table th:nth-child(3) { width:25%; }
+.step-table td:nth-child(4), .step-table th:nth-child(4) { width:10%; text-align:center; }
+.step-table td:nth-child(5), .step-table th:nth-child(5) { width:10%; text-align:center; }
+.screenshot { max-width:80px; max-height:80px; object-fit:cover; cursor:pointer; border:1px solid #ccc; border-radius:4px; }
+.environment-ribbon { background:#f4f6f8; padding:10px; font-size:0.9em; border-bottom:1px solid #ddd; display:flex; justify-content:space-around; flex-wrap:wrap; gap:8px; }
+.toolbar input, .toolbar select, .toolbar button { padding:6px 10px; border-radius:5px; border:1px solid #ccc; }
+.toolbar button { background:#007bff; color:white; border:none; cursor:pointer; }
+
+/* ===== Lightbox Modal ===== */
+.modal {
+    display: none; position: fixed; z-index: 9999;
+    padding-top: 60px; left: 0; top: 0;
+    width: 100%; height: 100%; overflow: auto;
+    background-color: rgba(0,0,0,0.9);
+}
+.modal-content { display:block; margin:auto; max-width:80%; max-height:80%; }
+video.modal-content { width:80%; background:black; }
+#closeModal {
+    position:absolute; top:20px; right:35px;
+    color:#fff; font-size:30px; font-weight:bold; cursor:pointer;
+}
+.chart-container canvas { max-width:300px !important; max-height:300px !important; }
+.detailed-report-link { text-align:right; padding:10px; display:block; }
+.detailed-report-link a { text-decoration:none; }
+.back-btn {
+    background: linear-gradient(90deg, #0e4494 0%, #1a6fd4 100%);
+    color: #fff;
+    padding: 10px 22px;
+    border-radius: 999px;
+    text-decoration: none;
+    box-shadow: 0 4px 14px rgba(14,68,148,0.30);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 14px 0;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.95em;
+    letter-spacing: 0.2px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+    border: none;
+}
+.back-btn:hover {
+    opacity: 0.95;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(14,68,148,0.36);
+}
+.back-btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.05em;
+    line-height: 1;
+}
+.status-pass { color:#28a745; font-weight:bold; }
+.status-fail { color:#dc3545; font-weight:bold; }
+.status-skipped { color:#ffc107; font-weight:bold; }
+.sla-pass { color:#28a745; font-weight:bold; }
+.sla-fail { color:#dc3545; font-weight:bold; }
+</style>
+</head>
+<body>
+
+<!-- ===== Summary Section ===== -->
+<div id="summary-section">
+    <div class="header">
+        <img alt="Company Logo" src="https://www.resulticks.com/images/logos/resulticks-logo-blue.svg"/>
+        <h2>Automation Test Summary Report</h2>
+        <img alt="Product Logo" src="https://run19.resul.io/assets/resulticks-logo-white-391eec89.svg"/>
+    </div>
+    <div class="summary-band">
+        <div>📊 Total: 7</div>
+        <div>✅ Passed: 5</div>
+        <div>❌ Failed: 2</div>
+        <div>⚠️ Skipped: 0</div>
+        <div>⏱️ Duration: 01:24:12</div>
+        <div>🎯 SLA: 90%</div>
+        <div>🎯 Pass Rate: 71.43%</div>
+    </div>
+    <div class="detailed-report-link">
+        <a class="back-btn" onclick="showDetailedReport()"><span class="back-btn-icon">&#8594;</span> Detailed Report</a>
+    </div>
+    <div class="main">
+        <div class="chart-container">
+            <canvas id="chart1"></canvas>
+        </div>
+        <div class="table-container">
+            <h3>Module-wise Results</h3>
+            <table>
+                <tr><th>Module</th><th>Total</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Duration</th><th>SLA %</th><th>Pass %</th></tr>
+                <tbody id="moduleTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+    <div class="footer">
+        Report generated on <span id="current-datetime">26-06-29 05:21:27</span> |
+        Contact: <a href="mailto:qaautomation@resulticks.com">qaautomation@resulticks.com</a>
+    </div>
+</div>
+
+<!-- ===== Detailed Section ===== -->
+<div id="detailed-section" class="detailed-section" style="padding:20px; box-sizing:border-box; width:100%;">
+    <div class="header"><img alt="Company Logo" src="https://www.resulticks.com/images/logos/resulticks-logo-blue.svg"/><h2>Detail Test Report</h2><img alt="Product Logo" src="https://run.resulticks.com/assets/resulticks-logo-white-391eec89.svg"/></div><div class="environment-ribbon"><span><strong>Environment:</strong> run</span><span><strong>Browser:</strong> chrome</span><span><strong>Release:</strong> 5.0</span><span><strong>Execution Date:</strong> 26-06-29 05:21:27</span></div><div style="text-align:right; padding:10px;"><a class="back-btn" onclick="showSummaryReport()"><span class="back-btn-icon">&#8592;</span> Back to Summary</a></div><div class="table-container"><h3>Test Case Results</h3><div class="toolbar"><div style="display:flex; gap:15px; flex-wrap:wrap; margin:20px 0;"><div><label><b>Search:</b></label><input id="searchInput" placeholder="Search test cases..." type="text"/></div><div><label><b>Filter by Status:</b></label><select id="statusFilter"><option value="">All</option><option value="PASS">Passed</option><option value="FAIL">Failed</option><option value="SKIPPED">Skipped</option></select></div></div></div><table id="testcaseTable">
+<colgroup>
+  <col style="width:40px">
+  <col style="width:11%">
+  <col style="width:10%">
+  <col>
+  <col style="width:9%">
+  <col style="width:8%">
+  <col style="width:10%">
+  <col style="width:26%">
+</colgroup>
+<thead><tr>
+  <th class="th-expand"></th>
+  <th>Module</th>
+  <th>Test Case ID</th>
+  <th>Description</th>
+  <th style="text-align:center;">Status</th>
+  <th style="text-align:center;">Duration</th>
+  <th style="text-align:center;">Video</th>
+  <th class="th-last7">Last 7 Execution</th>
+</tr></thead><tbody><tr data-test-id="tc1" data-status="PASS" data-expanded="false" data-module="AUDIENCE" data-testcaseid="RS-T1513" data-rundate="26-06-29 0" data-duration="267s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">AUDIENCE</td><td class="td-tcid">RS-T1513</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Upload audience using adhoc list single csv file and verify sync history">Upload audience using adhoc list single csv file and verify sync history</span></td><td style="text-align:center;"><span class="badge badge-pass">&#10003; Passed</span></td><td class="td-dur" style="text-align:center;">267s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T1513_20260628223141476518_test_upload_audience_using_adhoc_list_single_csv_file_and_verify_sync_history_20260629040141.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-pass" data-tooltip="Tue, 23 Jun 2026 - Pass">&#10003;</span><span class="mini-circle mini-pass" data-tooltip="Wed, 24 Jun 2026 - Pass">&#10003;</span><span class="mini-circle mini-fail" data-tooltip="Thu, 25 Jun 2026 - Fail">&#10007;</span><span class="mini-circle mini-pass" data-tooltip="Fri, 26 Jun 2026 - Pass">&#10003;</span><span class="mini-circle mini-pass" data-tooltip="Sat, 27 Jun 2026 - Pass">&#10003;</span><span class="mini-circle mini-fail" data-tooltip="Sun, 28 Jun 2026 - Fail">&#10007;</span><span class="mini-circle mini-pass" data-tooltip="Mon, 29 Jun 2026 - Pass">&#10003;</span></div></td></tr><tr class="details-row" id="tc1-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User successfully logged in.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1513_20260628222753676375_RS-T1513_20260629035752498127.jpg"/></td></tr><tr><td>Navigate to Preference module</td><td>Preference module opens successfully</td><td>Preference module opened successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1513_20260628222757336154_RS-T1513_20260629035757238562.jpg"/></td></tr><tr><td>Click on &#39;My profile&#39; sub-module</td><td>&#39;My profile&#39; sub-module should be opened successfully</td><td>&#39;My profile&#39; sub-module opened successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1513_20260628222804917519_RS-T1513_20260629035804569534.jpg"/></td></tr><tr><td>Get the date format from the My Profile page</td><td>Date format should be retrieved successfully</td><td>Date format retrieved successfully: MMM DD, YYYY</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1513_20260628222809852334_RS-T1513_20260629035806024177.jpg"/></td></tr><tr><td>Click the master data management page</td><td>User should navigate to the master data management page</td><td>User navigate to the master data management page successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1513_20260628222817051079_RS-T1513_20260629035816853201.jpg"/></td></tr><tr><td>Click the add audience page</td><td>User should navigate to the add audience page</td><td>User navigate to the add audience page successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1513_20260628222827490365_RS-T1513_20260629035827385567.jpg"/></td></tr><tr><td>Select the import source</td><td>User should select the import source as CSV</td><td>User select the import source successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1513_20260628222829599249_RS-T1513_20260629035828965927.jpg"/></td></tr><tr><td>Select the list type</td><td>User should select the list type as Ad-hoc list</td><td>User select the list type successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1513_20260628222830682757_RS-T1513_20260629035830349006.jpg"/></td></tr><tr><td>Verify the adhoc list popup content</td><td>Adhoc list popup content should displayed correctly.</td><td>Adhoc list popup content is displayed as expected</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1513_20260628222832273208_RS-T1513_20260629035832137670.jpg"/></td></tr><tr><td>Click the agree and proceed button</td><td>Popup should close</td><td>Popup is closed successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1513_20260628222834845538_RS-T1513_20260629035834700409.jpg"/></td></tr><tr><td>Enter the list name</td><td>List name should able to enter</td><td>List name is entered successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1513_20260628222838209705_RS-T1513_20260629035838106373.jpg"/></td></tr><tr><td>Upload the CSV file</td><td>CSV file should able to uploaded</td><td>CSV file is uploaded successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1513_20260628222840270540_RS-T1513_20260629035840152491.jpg"/></td></tr><tr><td>Click on Upload button</td><td>Upload button should able to click</td><td>Upload button is clicked successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1513_20260628222843380056_RS-T1513_20260629035843268253.jpg"/></td></tr><tr><td>Click the sync history icon</td><td>Page should navigate to Sync history page</td><td>Page is navigated to Sync history page</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1513_20260628222852349462_RS-T1513_20260629035852098191.jpg"/></td></tr><tr><td>Wait for upload completion</td><td>Uploaded completion should be present as expected</td><td>Uploaded completion is present as expected</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1513_20260628223115202456_RS-T1513_20260629040114994442.jpg"/></td></tr><tr><td>Verify the import description</td><td>Import description should be present as expected</td><td>Import description is present as expected</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1513_20260628223122083606_RS-T1513_20260629040121812953.jpg"/></td></tr><tr><td>Navigate to Target listing page</td><td>User should navigate to Target listing page</td><td>User navigated to Target listing page successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1513_20260628223124740242_RS-T1513_20260629040124590794.jpg"/></td></tr><tr><td>Search for created adhoc list</td><td>Adhoc list &#39;AL_Adhcup 03583529062026AM&#39; should be found</td><td>List found successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1513_20260628223137868626_RS-T1513_20260629040137694660.jpg"/></td></tr><tr><td>verify the created adhoc list</td><td>Uploaded csv and created list count should be matched</td><td>List and csv count is matched successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1513_20260628223138144557_RS-T1513_20260629040137965034.jpg"/></td></tr></table></td></tr><tr data-test-id="tc2" data-status="PASS" data-expanded="false" data-module="AUDIENCE" data-testcaseid="RS-T1695" data-rundate="26-06-29 0" data-duration="148s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">AUDIENCE</td><td class="td-tcid">RS-T1695</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Verify user is able to create and approve a dynamic list using website trigger">Verify user is able to create and approve a dynamic list using website trigger</span></td><td style="text-align:center;"><span class="badge badge-pass">&#10003; Passed</span></td><td class="td-dur" style="text-align:center;">148s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T1695_20260628223415710075_test_verify_user_is_able_to_create_and_approve_a_dynamic_list_using_website_trigger_20260629040415.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-pass" data-tooltip="Tue, 23 Jun 2026 - Pass">&#10003;</span><span class="mini-circle mini-pass" data-tooltip="Wed, 24 Jun 2026 - Pass">&#10003;</span><span class="mini-circle mini-pass" data-tooltip="Thu, 25 Jun 2026 - Pass">&#10003;</span><span class="mini-circle mini-pass" data-tooltip="Fri, 26 Jun 2026 - Pass">&#10003;</span><span class="mini-circle mini-pass" data-tooltip="Sat, 27 Jun 2026 - Pass">&#10003;</span><span class="mini-circle mini-pass" data-tooltip="Sun, 28 Jun 2026 - Pass">&#10003;</span><span class="mini-circle mini-pass" data-tooltip="Mon, 29 Jun 2026 - Pass">&#10003;</span></div></td></tr><tr class="details-row" id="tc2-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User successfully logged in.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260628223205300730_RS-T1695_20260629040205063679.jpg"/></td></tr><tr><td>Navigate to Audience Dynamic List section</td><td>User should navigate to the Audience Dynamic List section</td><td>User navigated to the Audience Dynamic List section successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260628223209086191_RS-T1695_20260629040209030239.jpg"/></td></tr><tr><td>Click Create Dynamic List</td><td>User should be able to open the Create Dynamic List page</td><td>Create Dynamic List page opened successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260628223211876787_RS-T1695_20260629040211781024.jpg"/></td></tr><tr><td>Enter unique Dynamic List Name</td><td>User should enter a unique Dynamic List Name</td><td>Dynamic List Name entered successfully.
+List Name: DynamicWebsite040212_29062026_AM</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260628223217090848_RS-T1695_20260629040216954798.jpg"/></td></tr><tr><td>Select Trigger Source</td><td>User should select Trigger Source as Website</td><td>Trigger Source selected successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260628223221597729_RS-T1695_20260629040221516020.jpg"/></td></tr><tr><td>Select Trigger Type</td><td>User should select the Trigger Type</td><td>Trigger Type selected successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260628223227523644_RS-T1695_20260629040227386829.jpg"/></td></tr><tr><td>Configure Rule One with Rule Type, Type, and Value</td><td>User should configure Rule One successfully</td><td>Rule One configured successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260628223238836863_RS-T1695_20260629040238521444.jpg"/></td></tr><tr><td>Select Approver One</td><td>User should select Approver One</td><td>Approver One selected successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260628223244741907_RS-T1695_20260629040244640149.jpg"/></td></tr><tr><td>Click Create Rule</td><td>Rule should be created successfully</td><td>Rule created successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260628223251875217_RS-T1695_20260629040251820735.jpg"/></td></tr><tr><td>Search created Dynamic List by name</td><td>User should be able to search the created Dynamic List</td><td>Dynamic List searched successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260628223300551929_RS-T1695_20260629040300233607.jpg"/></td></tr><tr><td>Verify Dynamic List appears in search results</td><td>Dynamic List should appear in search results</td><td>Dynamic List appeared in search results.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260628223302086348_RS-T1695_20260629040301872381.jpg"/></td></tr><tr><td>Verify Approval Status</td><td>Approval Status should display &quot;Pending for Approval&quot;</td><td>Approval Status displayed as Pending for Approval.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260628223304487145_RS-T1695_20260629040304334021.jpg"/></td></tr><tr><td>Verify Executed Communication Count</td><td>Executed Communication Count should be 0</td><td>Executed Communication Count verified as 0.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260628223305098134_RS-T1695_20260629040304936128.jpg"/></td></tr><tr><td>Approver logs in using approval credentials</td><td>Approver should log in successfully</td><td>Approver logged in successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260628223330499294_RS-T1695_20260629040330427876.jpg"/></td></tr><tr><td>Navigate to Audience Dynamic List section</td><td>User should navigate to the Audience Dynamic List section</td><td>User navigated to the Audience Dynamic List section successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260628223333076297_RS-T1695_20260629040332695166.jpg"/></td></tr><tr><td>Search created Dynamic List by name</td><td>User should be able to search the created Dynamic List</td><td>Dynamic List searched successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260628223339757438_RS-T1695_20260629040339225023.jpg"/></td></tr><tr><td>Verify Dynamic List appears in search results</td><td>Dynamic List should appear in search results</td><td>Dynamic List appeared in search results.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260628223341742745_RS-T1695_20260629040341360707.jpg"/></td></tr><tr><td>Click Dynamic List Approve icon</td><td>User should be able to click the Dynamic List Approve icon successfully</td><td>Dynamic List Approve icon clicked successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260628223347236769_RS-T1695_20260629040347149600.jpg"/></td></tr><tr><td>Click Approve</td><td>Request should be approved successfully</td><td>Request approved successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260628223400359249_RS-T1695_20260629040359607059.jpg"/></td></tr><tr><td>Search Dynamic List by name</td><td>User should be able to search the Dynamic List</td><td>Dynamic List searched successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260628223411118299_RS-T1695_20260629040410977963.jpg"/></td></tr><tr><td>Verify Dynamic List appears in search results</td><td>Dynamic List should appear in search results</td><td>Dynamic List appeared in search results.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260628223412329199_RS-T1695_20260629040412266558.jpg"/></td></tr><tr><td>Verify Approval Status</td><td>Approval Status should display &quot;Request Approved&quot;</td><td>Approval Status displayed as Request Approved.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260628223414594811_RS-T1695_20260629040414526807.jpg"/></td></tr></table></td></tr><tr data-test-id="tc3" data-status="FAIL" data-expanded="false" data-module="COMMUNICATION" data-testcaseid="RS-T2775" data-rundate="26-06-29 0" data-duration="50s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">COMMUNICATION</td><td class="td-tcid">RS-T2775</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Validate access producturl validation">Validate access producturl validation</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">50s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T2775_20260628223510729210_test_validate_access_producturl_validation_20260629040510.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-fail" data-tooltip="Tue, 23 Jun 2026 - Fail">&#10007;</span><span class="mini-circle mini-fail" data-tooltip="Wed, 24 Jun 2026 - Fail">&#10007;</span><span class="mini-circle mini-fail" data-tooltip="Thu, 25 Jun 2026 - Fail">&#10007;</span><span class="mini-circle mini-pass" data-tooltip="Fri, 26 Jun 2026 - Pass">&#10003;</span><span class="mini-circle mini-fail" data-tooltip="Sat, 27 Jun 2026 - Fail">&#10007;</span><span class="mini-circle mini-fail" data-tooltip="Sun, 28 Jun 2026 - Fail">&#10007;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 29 Jun 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc3-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User successfully logged in.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2775_20260628223441387540_RS-T2775_20260629040441165341.jpg"/></td></tr><tr><td>Launch Resulticks URL</td><td>Resulticks URL should be launched successfully</td><td>Resulticks URL launched successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2775_20260628223443648449_RS-T2775_20260629040442594190.jpg"/></td></tr><tr><td>Verify Resulticks page is loaded</td><td>Resulticks page should be displayed successfully</td><td>Resulticks page displayed successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2775_20260628223444259015_RS-T2775_20260629040444188222.jpg"/></td></tr><tr><td>Click Request Meeting on Resulticks page</td><td>User should navigate to Request Meeting form page</td><td>Navigated to Request Meeting form page</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2775_20260628223447859965_RS-T2775_20260629040447494428.jpg"/></td></tr><tr><td>Verify Resulticks Request Meeting form page</td><td>Request Meeting form page should be displayed</td><td>Form page displayed successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2775_20260628223453592779_RS-T2775_20260629040452413109.jpg"/></td></tr><tr><td>Launch GoResul URL</td><td>GoResul URL should be launched successfully</td><td>GoResul URL launched successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2775_20260628223458946392_RS-T2775_20260629040458597597.jpg"/></td></tr><tr><td>Verify GoResul page is loaded</td><td>GoResul page should be displayed successfully</td><td>GoResul page not displayed</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2775_20260628223500482010_RS-T2775_20260629040500251488.jpg"/></td></tr><tr><td>Click Request Meeting on GoResul page</td><td>User should navigate to Request Meeting form page</td><td>Navigated to Request Meeting form page</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2775_20260628223504400935_RS-T2775_20260629040503524337.jpg"/></td></tr><tr><td>Verify GoResul Request Meeting form page</td><td>Request Meeting form page should be displayed</td><td>Form page displayed successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2775_20260628223508201800_RS-T2775_20260629040508103218.jpg"/></td></tr></table></td></tr><tr data-test-id="tc4" data-status="PASS" data-expanded="false" data-module="COMMUNICATION" data-testcaseid="RS-T1763" data-rundate="26-06-29 0" data-duration="207s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">COMMUNICATION</td><td class="td-tcid">RS-T1763</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Communication emailcommunicationcreatevalidatetargetlist">Communication emailcommunicationcreatevalidatetargetlist</span></td><td style="text-align:center;"><span class="badge badge-pass">&#10003; Passed</span></td><td class="td-dur" style="text-align:center;">207s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T1763_20260628223846743200_test_communication_emailcommunicationcreatevalidatetargetlist_20260629040846.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-pass" data-tooltip="Tue, 23 Jun 2026 - Pass">&#10003;</span><span class="mini-circle mini-pass" data-tooltip="Wed, 24 Jun 2026 - Pass">&#10003;</span><span class="mini-circle mini-pass" data-tooltip="Thu, 25 Jun 2026 - Pass">&#10003;</span><span class="mini-circle mini-pass" data-tooltip="Fri, 26 Jun 2026 - Pass">&#10003;</span><span class="mini-circle mini-pass" data-tooltip="Sat, 27 Jun 2026 - Pass">&#10003;</span><span class="mini-circle mini-pass" data-tooltip="Sun, 28 Jun 2026 - Pass">&#10003;</span><span class="mini-circle mini-pass" data-tooltip="Mon, 29 Jun 2026 - Pass">&#10003;</span></div></td></tr><tr class="details-row" id="tc4-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User successfully logged in.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260628223544190156_RS-T1763_20260629040539664274.jpg"/></td></tr><tr><td>Select business unit &#39;Automation Testing&#39;</td><td>Business unit should be selected successfully</td><td>Business unit &#39;Automation Testing&#39; selected successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260628223551234813_RS-T1763_20260629040551096702.jpg"/></td></tr><tr><td>Click the Communication module</td><td>User should navigate to Communication module</td><td>User navigated to Communication module successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260628223555913390_RS-T1763_20260629040555549936.jpg"/></td></tr><tr><td>Click Create Communication</td><td>User should navigate to Communication Plan page</td><td>User navigated to Plan page successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260628223600555983_RS-T1763_20260629040600447455.jpg"/></td></tr><tr><td>Select communication dimension as Single Dimension</td><td>Communication dimension should be selected</td><td>Communication dimension selected successfully:Single Dimension</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260628223604914804_RS-T1763_20260629040604785756.jpg"/></td></tr><tr><td>Enter communication name</td><td>Communication name should be entered successfully</td><td>Communication name entered: EmailTL_RUN_040605_29062026_AM</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260628223605429132_RS-T1763_20260629040605355408.jpg"/></td></tr><tr><td>Enable Test Communication checkbox</td><td>Test communication checkbox should be enabled</td><td>Test communication enabled successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260628223606078503_RS-T1763_20260629040605896162.jpg"/></td></tr><tr><td>Select communication type</td><td>Communication type should be selected</td><td>Selected communication type: greetings</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260628223611158958_RS-T1763_20260629040611052089.jpg"/></td></tr><tr><td>Select product type</td><td>Product type should be selected</td><td>Product type selected successfully: Cloud Computing</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260628223614944518_RS-T1763_20260629040614848707.jpg"/></td></tr><tr><td>Select primary goal</td><td>Primary goal should be selected</td><td>Primary goal selected successfully:Reach</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260628223618374609_RS-T1763_20260629040618316739.jpg"/></td></tr><tr><td>Enter goal percentage</td><td>Goal percentage should be entered</td><td>Goal percentage entered successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260628223618937537_RS-T1763_20260629040618838229.jpg"/></td></tr><tr><td>Select communication start date as Today</td><td>Start date should be selected as Today</td><td>Start date selected successfully:Jun 29, 2026</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260628223623493319_RS-T1763_20260629040623428676.jpg"/></td></tr><tr><td>Select communication end date as three days from today</td><td>End date should be selected</td><td>End date selected successfully:Jul 02, 2026</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260628223626242645_RS-T1763_20260629040625772834.jpg"/></td></tr><tr><td>Select email channel</td><td>email channel should be selected</td><td>email channel selected successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260628223626625473_RS-T1763_20260629040626447135.jpg"/></td></tr><tr><td>Enable Web Analytics</td><td>Web Analytics should be enabled</td><td>Web Analytics enabled successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260628223627052931_RS-T1763_20260629040626921868.jpg"/></td></tr><tr><td>Click Next button on Plan page</td><td>User should navigate to Authoring page</td><td>User navigated to Authoring page successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260628223627408258_RS-T1763_20260629040627306997.jpg"/></td></tr><tr><td>Enable Smart URL</td><td>Smart URL should be enabled successfully</td><td>Smart URL enabled successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260628223633676480_RS-T1763_20260629040633449912.jpg"/></td></tr><tr><td>Create &quot;1&quot; Smart URL for &quot;email&quot;</td><td>1 Smart URL should be created successfully for email</td><td>Created Smart URL(s): [&#39;https://re.cx/TV7A&#39;]</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260628223652447096_RS-T1763_20260629040651341554.jpg"/></td></tr><tr><td>Select the audience list</td><td>User should select the audience list Trgt04100412062026AM</td><td>Audience list selected successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260628223701051008_RS-T1763_20260629040700863159.jpg"/></td></tr><tr><td>Retrieve audience count</td><td>Audience count should be retrieved successfully</td><td>Audience count retrieved successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260628223703030768_RS-T1763_20260629040702983731.jpg"/></td></tr><tr><td>Enter email subject line with emoji</td><td>Email subject line should support emoji</td><td>Email subject line supports emoji</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260628223712503382_RS-T1763_20260629040712443414.jpg"/></td></tr><tr><td>Click import content</td><td>Import content should be opened</td><td>Import content opened successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260628223714052373_RS-T1763_20260629040713618680.jpg"/></td></tr><tr><td>Upload EDM zip file</td><td>EDM zip file should be uploaded successfully</td><td>EDM uploaded successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260628223720760192_RS-T1763_20260629040720691407.jpg"/></td></tr><tr><td>Select unsubscribe option</td><td>Unsubscribe option should be selected</td><td>Unsubscribe option selected successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260628223727474182_RS-T1763_20260629040727413913.jpg"/></td></tr><tr><td>Select email footer</td><td>Email footer should be selected</td><td>Email footer selected successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260628223735320088_RS-T1763_20260629040734928186.jpg"/></td></tr><tr><td>Configure the schedule time to &quot;after 15 mins&quot;</td><td>Schedule time should be configured as &quot;after 15 mins&quot; successfully</td><td>Configured schedule time successfully.
+Selected Day: after 15 mins
+Blast Time: Jun 29, 2026 06:55 AM</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260628223739673588_RS-T1763_20260629040739520702.jpg"/></td></tr><tr><td>Click authoring page next button</td><td>User should navigate to analytics or pre-communication page successfully</td><td>Clicked authoring next button successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260628223750862050_RS-T1763_20260629040750638355.jpg"/></td></tr><tr><td>Enter web analytics details and proceed</td><td>User should navigate to next page after entering analytics details</td><td>Navigated successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260628223811308894_RS-T1763_20260629040810693626.jpg"/></td></tr><tr><td>Validate audience count with authoring page</td><td>Audience count should match the audience count displayed in the authoring page</td><td>Audience count matches with authoring page</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260628223816523893_RS-T1763_20260629040816437659.jpg"/></td></tr><tr><td>Proceed to pre-communication page and click next</td><td>User should navigate to next page</td><td>Navigated successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260628223821666015_RS-T1763_20260629040821475068.jpg"/></td></tr><tr><td>Search communication in listing page and verify status</td><td>Communication status should be &quot;Scheduled&quot; in listing page</td><td>Communication status verified as &quot;Scheduled&quot; in listing page</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260628223845948712_RS-T1763_20260629040845886775.jpg"/></td></tr></table></td></tr><tr data-test-id="tc5" data-status="PASS" data-expanded="false" data-module="COMMUNICATION" data-testcaseid="RS-T1766" data-rundate="26-06-29 0" data-duration="197s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">COMMUNICATION</td><td class="td-tcid">RS-T1766</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Communication emailcommunicationcreatevalidateadhoclist">Communication emailcommunicationcreatevalidateadhoclist</span></td><td style="text-align:center;"><span class="badge badge-pass">&#10003; Passed</span></td><td class="td-dur" style="text-align:center;">197s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T1766_20260628224206087579_test_communication_emailcommunicationcreatevalidateadhoclist_20260629041205.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-pass" data-tooltip="Tue, 23 Jun 2026 - Pass">&#10003;</span><span class="mini-circle mini-pass" data-tooltip="Wed, 24 Jun 2026 - Pass">&#10003;</span><span class="mini-circle mini-pass" data-tooltip="Thu, 25 Jun 2026 - Pass">&#10003;</span><span class="mini-circle mini-pass" data-tooltip="Fri, 26 Jun 2026 - Pass">&#10003;</span><span class="mini-circle mini-pass" data-tooltip="Sat, 27 Jun 2026 - Pass">&#10003;</span><span class="mini-circle mini-pass" data-tooltip="Sun, 28 Jun 2026 - Pass">&#10003;</span><span class="mini-circle mini-pass" data-tooltip="Mon, 29 Jun 2026 - Pass">&#10003;</span></div></td></tr><tr class="details-row" id="tc5-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User successfully logged in.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628223906968211_RS-T1766_20260629040906422638.jpg"/></td></tr><tr><td>Navigate to Preference module</td><td>Preference module opens successfully</td><td>Preference module opened successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628223910015803_RS-T1766_20260629040909777096.jpg"/></td></tr><tr><td>Click on &#39;My profile&#39; sub-module</td><td>&#39;My profile&#39; sub-module should be opened successfully</td><td>&#39;My profile&#39; sub-module opened successfully.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628223915199377_RS-T1766_20260629040914892919.jpg"/></td></tr><tr><td>Get My Profile name for platform validation</td><td>My Profile name should be retrieved successfully</td><td>My Profile name retrieved successfully: Vijay</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628223916726705_RS-T1766_20260629040916438062.jpg"/></td></tr><tr><td>Get My Profile date format for platform validation</td><td>My Profile date format should be retrieved successfully</td><td>My Profile date format retrieved successfully: MMM DD, YYYY</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628223918427089_RS-T1766_20260629040918228758.jpg"/></td></tr><tr><td>Get My Profile time zone for platform validation</td><td>My Profile time zone should be retrieved successfully</td><td>My Profile time zone retrieved successfully: (GMT+08:00) Kuala Lumpur, Singapore</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628223920777583_RS-T1766_20260629040920340884.jpg"/></td></tr><tr><td>Get My Profile time format for platform validation</td><td>My Profile time format should be retrieved successfully</td><td>My Profile time format retrieved successfully: 12 hours</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628223922149931_RS-T1766_20260629040921930470.jpg"/></td></tr><tr><td>Click the Communication module</td><td>User should navigate to Communication module</td><td>User navigated to Communication module successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628223924180675_RS-T1766_20260629040924122030.jpg"/></td></tr><tr><td>Click Create Communication</td><td>User should navigate to Communication Plan page</td><td>User navigated to Plan page successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628223925718043_RS-T1766_20260629040925574258.jpg"/></td></tr><tr><td>Select communication dimension as Single Dimension</td><td>Communication dimension should be selected</td><td>Communication dimension selected successfully:Single Dimension</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628223929440517_RS-T1766_20260629040929359785.jpg"/></td></tr><tr><td>Enter communication name</td><td>Communication name should be entered successfully</td><td>Communication name entered: EmailAdhoc_RUN_040929_29062026_AM</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628223929796656_RS-T1766_20260629040929726774.jpg"/></td></tr><tr><td>Enable Test Communication checkbox</td><td>Test communication checkbox should be enabled</td><td>Test communication enabled successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628223930133848_RS-T1766_20260629040930036739.jpg"/></td></tr><tr><td>Select communication type</td><td>Communication type should be selected</td><td>Selected communication type: greetings</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628223934923009_RS-T1766_20260629040934865053.jpg"/></td></tr><tr><td>Select product type</td><td>Product type should be selected</td><td>Product type selected successfully: Cloud Computing</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628223938820928_RS-T1766_20260629040938648565.jpg"/></td></tr><tr><td>Select primary goal</td><td>Primary goal should be selected</td><td>Primary goal selected successfully:Reach</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628223940476218_RS-T1766_20260629040940393798.jpg"/></td></tr><tr><td>Enter goal percentage</td><td>Goal percentage should be entered</td><td>Goal percentage entered successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628223940925435_RS-T1766_20260629040940857557.jpg"/></td></tr><tr><td>Select communication start date as Today</td><td>Start date should be selected as Today</td><td>Start date selected successfully:Jun 29, 2026</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628223945357853_RS-T1766_20260629040945267779.jpg"/></td></tr><tr><td>Select communication end date as three days from today</td><td>End date should be selected</td><td>End date selected successfully:Jul 02, 2026</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628223949279174_RS-T1766_20260629040949179735.jpg"/></td></tr><tr><td>Select email channel</td><td>email channel should be selected</td><td>email channel selected successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628223950239962_RS-T1766_20260629040950108692.jpg"/></td></tr><tr><td>Enable Web Analytics</td><td>Web Analytics should be enabled</td><td>Web Analytics enabled successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628223951701058_RS-T1766_20260629040951570338.jpg"/></td></tr><tr><td>Click Next button on Plan page</td><td>User should navigate to Authoring page</td><td>User navigated to Authoring page successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628223952545708_RS-T1766_20260629040952449091.jpg"/></td></tr><tr><td>Enable Smart URL</td><td>Smart URL should be enabled successfully</td><td>Smart URL enabled successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628223957758723_RS-T1766_20260629040957595275.jpg"/></td></tr><tr><td>Create &quot;1&quot; Smart URL for &quot;email&quot;</td><td>1 Smart URL should be created successfully for email</td><td>Created Smart URL(s): [&#39;https://re.cx/39RN&#39;]</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628224013229186_RS-T1766_20260629041012551646.jpg"/></td></tr><tr><td>Select the audience list</td><td>User should select the audience list AL_Adhcup 03583012062026AM</td><td>Audience list selected successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628224023127950_RS-T1766_20260629041022982687.jpg"/></td></tr><tr><td>Retrieve audience count</td><td>Audience count should be retrieved successfully</td><td>Audience count retrieved successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628224024684137_RS-T1766_20260629041024627772.jpg"/></td></tr><tr><td>Enter email subject line with emoji</td><td>Email subject line should support emoji</td><td>Email subject line supports emoji</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628224031772973_RS-T1766_20260629041031646390.jpg"/></td></tr><tr><td>Click import content</td><td>Import content should be opened</td><td>Import content opened successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628224032546009_RS-T1766_20260629041032493800.jpg"/></td></tr><tr><td>Upload EDM zip file</td><td>EDM zip file should be uploaded successfully</td><td>EDM uploaded successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628224038440183_RS-T1766_20260629041038354634.jpg"/></td></tr><tr><td>Select unsubscribe option</td><td>Unsubscribe option should be selected</td><td>Unsubscribe option selected successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628224044533608_RS-T1766_20260629041044430028.jpg"/></td></tr><tr><td>Select email footer</td><td>Email footer should be selected</td><td>Email footer selected successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628224050671909_RS-T1766_20260629041050463909.jpg"/></td></tr><tr><td>Configure the schedule time to &quot;after 15 mins&quot;</td><td>Schedule time should be configured as &quot;after 15 mins&quot; successfully</td><td>Configured schedule time successfully.
+Selected Day: after 15 mins
+Blast Time: Jun 29, 2026 06:55 AM</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628224054612315_RS-T1766_20260629041054503628.jpg"/></td></tr><tr><td>Click authoring page next button</td><td>User should navigate to analytics or pre-communication page successfully</td><td>Clicked authoring next button successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628224115118170_RS-T1766_20260629041114713576.jpg"/></td></tr><tr><td>Enter web analytics details and proceed</td><td>User should navigate to next page after entering analytics details</td><td>Navigated successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628224130817898_RS-T1766_20260629041130679211.jpg"/></td></tr><tr><td>Validate audience count with authoring page</td><td>Audience count should match the audience count displayed in the authoring page</td><td>Audience count matches with authoring page</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628224132330029_RS-T1766_20260629041132267776.jpg"/></td></tr><tr><td>Proceed to pre-communication page and click next</td><td>User should navigate to next page</td><td>Navigated successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628224136372504_RS-T1766_20260629041136006647.jpg"/></td></tr><tr><td>Search communication in listing page and verify status</td><td>Communication status should be &quot;Scheduled&quot; in listing page</td><td>Communication status verified as &quot;Scheduled&quot; in listing page</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628224202180702_RS-T1766_20260629041201950950.jpg"/></td></tr><tr><td>Validate created by user name in communication listing</td><td>Created by user name should be displayed correctly</td><td>Created by user name displayed correctly</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628224202409572_RS-T1766_20260629041202335623.jpg"/></td></tr><tr><td>Validate product type in communication listing</td><td>Product type should be displayed correctly in communication listing</td><td>Product type displayed correctly</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628224203715070_RS-T1766_20260629041203616576.jpg"/></td></tr><tr><td>Validate total audience in communication listing</td><td>Total audience count should match the expected audience count</td><td>Total audience count matches successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628224203941447_RS-T1766_20260629041203866119.jpg"/></td></tr><tr><td>Click communication listing page expand icon</td><td>Communication details section should expand successfully</td><td>Communication details expanded successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628224205121705_RS-T1766_20260629041205022363.jpg"/></td></tr><tr><td>Validate communication listing page schedule time</td><td>Schedule time should be displayed correctly in communication listing</td><td>Schedule time displayed correctly : Jun 29, 2026 07:55 AM</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260628224205382263_RS-T1766_20260629041205189252.jpg"/></td></tr></table></td></tr><tr data-test-id="tc6" data-status="FAIL" data-expanded="false" data-module="COMMUNICATION" data-testcaseid="RS-T1774" data-rundate="26-06-29 0" data-duration="1318s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">COMMUNICATION</td><td class="td-tcid">RS-T1774</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Communication emailcommunicationadhocpreview">Communication emailcommunicationadhocpreview</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">1318s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T1774_20260628234815535993_test_communication_emailcommunicationadhocpreview_20260629051815.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-pass" data-tooltip="Tue, 23 Jun 2026 - Pass">&#10003;</span><span class="mini-circle mini-pass" data-tooltip="Wed, 24 Jun 2026 - Pass">&#10003;</span><span class="mini-circle mini-pass" data-tooltip="Thu, 25 Jun 2026 - Pass">&#10003;</span><span class="mini-circle mini-pass" data-tooltip="Fri, 26 Jun 2026 - Pass">&#10003;</span><span class="mini-circle mini-pass" data-tooltip="Sat, 27 Jun 2026 - Pass">&#10003;</span><span class="mini-circle mini-pass" data-tooltip="Sun, 28 Jun 2026 - Pass">&#10003;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 29 Jun 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc6-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User successfully logged in.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1774_20260628232639545664_RS-T1774_20260629045637077521.jpg"/></td></tr><tr><td>Click the Communication module</td><td>User should navigate to Communication module</td><td>User navigated to Communication module successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1774_20260628232643472228_RS-T1774_20260629045641409072.jpg"/></td></tr><tr><td>Click Create Communication</td><td>User should navigate to Communication Plan page</td><td>User navigated to Plan page successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1774_20260628232646603950_RS-T1774_20260629045646181683.jpg"/></td></tr><tr><td>Select communication dimension as Single Dimension</td><td>Communication dimension should be selected</td><td>Communication dimension selected successfully:Single Dimension</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1774_20260628232653689364_RS-T1774_20260629045652517150.jpg"/></td></tr><tr><td>Enter communication name</td><td>Communication name should be entered successfully</td><td>Communication name entered: EmailAdhocpreview_RUN_045656_29062026_AM</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1774_20260628232657499884_RS-T1774_20260629045657377872.jpg"/></td></tr><tr><td>Enable Test Communication checkbox</td><td>Test communication checkbox should be enabled</td><td>Test communication enabled successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1774_20260628232657864054_RS-T1774_20260629045657794707.jpg"/></td></tr><tr><td>Select communication type</td><td>Communication type should be selected</td><td>Selected communication type: greetings</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1774_20260628232704189768_RS-T1774_20260629045704044995.jpg"/></td></tr><tr><td>Select product type</td><td>Product type should be selected</td><td>Product type selected successfully: Cloud Computing</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1774_20260628232711077390_RS-T1774_20260629045710835013.jpg"/></td></tr><tr><td>Select primary goal</td><td>Primary goal should be selected</td><td>Primary goal selected successfully:Reach</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1774_20260628232715204746_RS-T1774_20260629045715143598.jpg"/></td></tr><tr><td>Enter goal percentage</td><td>Goal percentage should be entered</td><td>Goal percentage entered successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1774_20260628232716163623_RS-T1774_20260629045716081392.jpg"/></td></tr><tr><td>Select communication start date as Today</td><td>Start date should be selected as Today</td><td>Start date selected successfully:Jun 29, 2026</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1774_20260628232722156311_RS-T1774_20260629045722075799.jpg"/></td></tr><tr><td>Select communication end date as three days from today</td><td>End date should be selected</td><td>End date selected successfully:Jul 02, 2026</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1774_20260628232729451697_RS-T1774_20260629045728155495.jpg"/></td></tr><tr><td>Select email channel</td><td>email channel should be selected</td><td>email channel selected successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1774_20260628232730209251_RS-T1774_20260629045730105277.jpg"/></td></tr><tr><td>Enable Web Analytics</td><td>Web Analytics should be enabled</td><td>Web Analytics enabled successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1774_20260628232732551323_RS-T1774_20260629045731714627.jpg"/></td></tr><tr><td>Click Next button on Plan page</td><td>User should navigate to Authoring page</td><td>User navigated to Authoring page successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1774_20260628232737505665_RS-T1774_20260629045737315644.jpg"/></td></tr><tr><td>Enable Smart URL</td><td>Smart URL should be enabled successfully</td><td>Smart URL enabled successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1774_20260628232744417625_RS-T1774_20260629045743703225.jpg"/></td></tr><tr><td>Create &quot;1&quot; Smart URL for &quot;email&quot;</td><td>1 Smart URL should be created successfully for email</td><td>Created Smart URL(s): [&#39;https://re.cx/NAW8&#39;]</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1774_20260628232809507657_RS-T1774_20260629045808744623.jpg"/></td></tr><tr><td>Select the audience list</td><td>User should select the audience list AL_Adhcup 03583012062026AM</td><td>Audience list selected successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1774_20260628232819324035_RS-T1774_20260629045819195777.jpg"/></td></tr><tr><td>Retrieve audience count</td><td>Audience count should be retrieved successfully</td><td>Audience count retrieved successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1774_20260628232821222303_RS-T1774_20260629045821176534.jpg"/></td></tr><tr><td>Enter email subject line with emoji</td><td>Email subject line should support emoji</td><td>Email subject line supports emoji</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1774_20260628232828720473_RS-T1774_20260629045828596242.jpg"/></td></tr><tr><td>Click import content</td><td>Import content should be opened</td><td>Import content opened successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1774_20260628232829476585_RS-T1774_20260629045829389774.jpg"/></td></tr><tr><td>Upload EDM zip file</td><td>EDM zip file should be uploaded successfully</td><td>EDM uploaded successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1774_20260628232834881696_RS-T1774_20260629045834720778.jpg"/></td></tr><tr><td>Select unsubscribe option</td><td>Unsubscribe option should be selected</td><td>Unsubscribe option selected successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1774_20260628232840809544_RS-T1774_20260629045840556485.jpg"/></td></tr><tr><td>Select email footer</td><td>Email footer should be selected</td><td>Email footer selected successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1774_20260628232846908921_RS-T1774_20260629045846820911.jpg"/></td></tr><tr><td>Send test preview email</td><td>Test email should be sent successfully</td><td>Test email failed</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1774_20260628232920848476_RS-T1774_20260629045920769734.jpg"/></td></tr><tr><td>Click authoring save button</td><td>Communication should be saved successfully</td><td>Saved successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1774_20260628232923923553_RS-T1774_20260629045923694882.jpg"/></td></tr><tr><td>Search communication in listing page and verify status</td><td>Communication status should be &quot;Draft&quot; in listing page</td><td>Communication status verified as &quot;Draft&quot; in listing page</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1774_20260628232958135109_RS-T1774_20260629045957807589.jpg"/></td></tr><tr><td>Verify email received after blast</td><td>Email should be received successfully</td><td>Email not received</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1774_20260628234752265292_RS-T1774_20260629051752148665.jpg"/></td></tr><tr><td>Validate View in Browser</td><td>Page should display correctly in browser</td><td>Page display failed</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1774_20260628234752410682_RS-T1774_20260629051752343197.jpg"/></td></tr><tr><td>Validate forward mail link</td><td>Forward link should be displayed correctly</td><td>Forward link displayed correctly</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1774_20260628234752613038_RS-T1774_20260629051752519877.jpg"/></td></tr><tr><td>the user clicks on &quot;Unsubscribe&quot; and verifies the link navigates and displays the correct page</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1774_20260628234813018135_RS-T1774_20260629051812915093.jpg"/></td></tr></table></td></tr><tr data-test-id="tc7" data-status="PASS" data-expanded="false" data-module="COMMUNICATION" data-testcaseid="RS-T2118" data-rundate="26-06-29 0" data-duration="169s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">COMMUNICATION</td><td class="td-tcid">RS-T2118</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Create sdc mobile alert push communication with browser image">Create sdc mobile alert push communication with browser image</span></td><td style="text-align:center;"><span class="badge badge-pass">&#10003; Passed</span></td><td class="td-dur" style="text-align:center;">169s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T2118_20260628235106556747_test_create_sdc_mobile_alert_push_communication_with_browser_image_20260629052106.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-pass" data-tooltip="Tue, 23 Jun 2026 - Pass">&#10003;</span><span class="mini-circle mini-pass" data-tooltip="Wed, 24 Jun 2026 - Pass">&#10003;</span><span class="mini-circle mini-pass" data-tooltip="Thu, 25 Jun 2026 - Pass">&#10003;</span><span class="mini-circle mini-fail" data-tooltip="Fri, 26 Jun 2026 - Fail">&#10007;</span><span class="mini-circle mini-fail" data-tooltip="Sat, 27 Jun 2026 - Fail">&#10007;</span><span class="mini-circle mini-pass" data-tooltip="Sun, 28 Jun 2026 - Pass">&#10003;</span><span class="mini-circle mini-pass" data-tooltip="Mon, 29 Jun 2026 - Pass">&#10003;</span></div></td></tr><tr class="details-row" id="tc7-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User successfully logged in.</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260628234836168405_RS-T2118_20260629051835754332.jpg"/></td></tr><tr><td>Click the Communication module</td><td>User should navigate to Communication module</td><td>User navigated to Communication module successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260628234837183528_RS-T2118_20260629051837070730.jpg"/></td></tr><tr><td>Click Create Communication</td><td>User should navigate to Communication Plan page</td><td>User navigated to Plan page successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260628234838574645_RS-T2118_20260629051838479461.jpg"/></td></tr><tr><td>Select communication dimension as Single Dimension</td><td>Communication dimension should be selected</td><td>Communication dimension selected successfully:Single Dimension</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260628234842023381_RS-T2118_20260629051841943792.jpg"/></td></tr><tr><td>Enter communication name</td><td>Communication name should be entered successfully</td><td>Communication name entered: mpAlertImg_RUN_051842_29062026_AM</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260628234842336231_RS-T2118_20260629051842276915.jpg"/></td></tr><tr><td>Enable Test Communication checkbox</td><td>Test communication checkbox should be enabled</td><td>Test communication enabled successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260628234842592517_RS-T2118_20260629051842532142.jpg"/></td></tr><tr><td>Select communication type</td><td>Communication type should be selected</td><td>Selected communication type: greetings</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260628234847083346_RS-T2118_20260629051847026027.jpg"/></td></tr><tr><td>Select product type</td><td>Product type should be selected</td><td>Product type selected successfully: Cloud Computing</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260628234850503210_RS-T2118_20260629051850429201.jpg"/></td></tr><tr><td>Select primary goal</td><td>Primary goal should be selected</td><td>Primary goal selected successfully:Reach</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260628234851931986_RS-T2118_20260629051851838789.jpg"/></td></tr><tr><td>Enter goal percentage</td><td>Goal percentage should be entered</td><td>Goal percentage entered successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260628234852277512_RS-T2118_20260629051852193986.jpg"/></td></tr><tr><td>Select communication start date as Today</td><td>Start date should be selected as Today</td><td>Start date selected successfully:Jun 29, 2026</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260628234856390544_RS-T2118_20260629051856305883.jpg"/></td></tr><tr><td>Select communication end date as three days from today</td><td>End date should be selected</td><td>End date selected successfully:Jul 02, 2026</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260628234858580208_RS-T2118_20260629051858527247.jpg"/></td></tr><tr><td>Select Notification channel</td><td>Notification channel should be selected</td><td>Notification channel selected successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260628234858799052_RS-T2118_20260629051858721977.jpg"/></td></tr><tr><td>Enable Web Analytics</td><td>Web Analytics should be enabled</td><td>Web Analytics enabled successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260628234858916132_RS-T2118_20260629051858863807.jpg"/></td></tr><tr><td>Enable app analytics</td><td>App analytics should be enabled successfully</td><td>App analytics enabled successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260628234900177926_RS-T2118_20260629051900103229.jpg"/></td></tr><tr><td>Click Next button on Plan page</td><td>User should navigate to Authoring page</td><td>User navigated to Authoring page successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260628234900622177_RS-T2118_20260629051900512422.jpg"/></td></tr><tr><td>Enable Smart URL</td><td>Smart URL should be enabled successfully</td><td>Smart URL enabled successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260628234904978355_RS-T2118_20260629051904888524.jpg"/></td></tr><tr><td>Create &quot;1&quot; Smart URL for &quot;Mobile Push&quot;</td><td>1 Smart URL should be created successfully for Mobile Push</td><td>Created Smart URL(s): [&#39;https://re.cx/AWWU&#39;]</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260628234926047072_RS-T2118_20260629051925969409.jpg"/></td></tr><tr><td>Click mobile push notification tab</td><td>Mobile push notification tab should be opened successfully</td><td>Mobile push notification tab opened successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260628234928905376_RS-T2118_20260629051928842693.jpg"/></td></tr><tr><td>Add recipients &quot;notificationAudience&quot;</td><td>Recipients should be added successfully</td><td>Added recipient(s): All audience (Known &amp; Identified), </td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260628234936827153_RS-T2118_20260629051936756139.jpg"/></td></tr><tr><td>Capture authoring page audience count</td><td>Audience count should be captured successfully</td><td>Captured audience count: 3</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260628234937038188_RS-T2118_20260629051936979673.jpg"/></td></tr><tr><td>Select mobile push delivery type</td><td>Mobile push delivery type should be selected successfully</td><td>Selected mobile push delivery type: True</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260628234955032386_RS-T2118_20260629051954907439.jpg"/></td></tr><tr><td>Click create content</td><td>Create content section should open successfully</td><td>Create content clicked successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260628234956208462_RS-T2118_20260629051956128812.jpg"/></td></tr><tr><td>Enter notification title using &quot;Persona_2&quot;</td><td>Notification title should be entered successfully</td><td>Entered notification title: [[EmailID]] | [[EmailID]] mpAlertImg_RUN_290626_0519</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260628235007910241_RS-T2118_20260629052007829639.jpg"/></td></tr><tr><td>Set title text font color</td><td>Title text font color should be set successfully</td><td>Title text font color set: True</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260628235008353427_RS-T2118_20260629052008290787.jpg"/></td></tr><tr><td>Enter mobile push subject line</td><td>Mobile push subject line should be entered successfully</td><td>Entered mobile push subject line: This is mobile notification of mpAlertImg_RUN_051842_2906202</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260628235008747737_RS-T2118_20260629052008679986.jpg"/></td></tr><tr><td>Enter mobile push body content with personalization &quot;true&quot; using &quot;Persona_1&quot; and &quot;Persona_2&quot;</td><td>Mobile push body content should be entered successfully</td><td>Entered mobile push body content: True</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260628235012642494_RS-T2118_20260629052012592672.jpg"/></td></tr><tr><td>Set content background color</td><td>Content background color should be set successfully</td><td>Content background color set: True</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260628235013214163_RS-T2118_20260629052013158246.jpg"/></td></tr><tr><td>Add font style for body content</td><td>Font style should be added for body content successfully</td><td>Font style added for body content successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260628235017171254_RS-T2118_20260629052017112046.jpg"/></td></tr><tr><td>Upload the web push browser image</td><td>Web push browser image should be uploaded successfully</td><td>Uploaded browser image: True</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260628235020888619_RS-T2118_20260629052020817847.jpg"/></td></tr><tr><td>Select interactivity button</td><td>Interactivity button should be selected successfully</td><td>Interactivity selected: Homepage Link</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260628235027158349_RS-T2118_20260629052027012676.jpg"/></td></tr><tr><td>Configure the schedule time to &quot;after 15 mins&quot;</td><td>Schedule time should be configured as &quot;after 15 mins&quot; successfully</td><td>Configured schedule time successfully.
+Selected Day: after 15 mins
+Blast Time: Jun 29, 2026 08:05 AM</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260628235030864356_RS-T2118_20260629052030817005.jpg"/></td></tr><tr><td>Save the communication</td><td>Communication should be saved successfully</td><td>Communication saved successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260628235042778749_RS-T2118_20260629052042446815.jpg"/></td></tr><tr><td>Search communication in listing page and verify status</td><td>Communication status should be &quot;Scheduled&quot; in listing page</td><td>Communication status verified as &quot;Scheduled&quot; in listing page</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260628235106116677_RS-T2118_20260629052106053932.jpg"/></td></tr></table></td></tr></tbody></table></div>
+<script>
+function toggleDetails(row) {
+    // row could be the <tr> itself (passed from onclick on the expand td)
+    if (!row || !row.getAttribute) return;
+    var detailsRow = document.getElementById(row.getAttribute('data-test-id') + '-details');
+    if (!detailsRow) return;
+    var expandIcon = row.querySelector('.expand-icon .chevron');
+    if (detailsRow.style.display === 'none') {
+        detailsRow.style.display = 'table-row';
+        row.setAttribute('data-expanded', 'true');
+        if (expandIcon) { expandIcon.innerHTML = '&#9660;'; expandIcon.style.color = '#0e4494'; }
+    } else {
+        detailsRow.style.display = 'none';
+        row.setAttribute('data-expanded', 'false');
+        if (expandIcon) { expandIcon.innerHTML = '&#9654;'; expandIcon.style.color = '#666'; }
+    }
+}
+
+function playVideoHandler(event, element) {
+    event.stopPropagation();
+    event.preventDefault();
+    var modal = document.getElementById('lightboxModal');
+    var modalImg = document.getElementById('lightboxImage');
+    var modalVideo = document.getElementById('lightboxVideo');
+    if (modal && modalImg && modalVideo) {
+        modalImg.style.display = 'none';
+        modalImg.src = '';
+        modalVideo.src = element.getAttribute('data-video');
+        modalVideo.style.display = 'block';
+        modal.style.display = 'block';
+        modalVideo.play();
+    }
+}
+
+function applySearchAndFilter() {
+    var searchText = document.getElementById('searchInput').value.toLowerCase().trim();
+    var filterValue = document.getElementById('statusFilter').value;
+    var mainRows = document.querySelectorAll('#testcaseTable > tbody > tr:not(.details-row)');
+    mainRows.forEach(function(row) {
+        var rowText = row.textContent.toLowerCase();
+        var rowStatus = row.getAttribute('data-status') || '';
+        var matchesSearch = !searchText || rowText.includes(searchText);
+        var matchesFilter = !filterValue || rowStatus === filterValue;
+        var shouldShow = matchesSearch && matchesFilter;
+        var testId = row.getAttribute('data-test-id');
+        var detailsRow = document.getElementById(testId + '-details');
+        if (shouldShow) {
+            row.style.display = '';
+            if (detailsRow) {
+                var expanded = row.getAttribute('data-expanded') === 'true';
+                detailsRow.style.display = expanded ? 'table-row' : 'none';
+            }
+        } else {
+            row.style.display = 'none';
+            if (detailsRow) detailsRow.style.display = 'none';
+            var ch = row.querySelector('.expand-icon .chevron');
+            if (ch) { ch.innerHTML = '&#9654;'; ch.style.color = '#666'; }
+            row.setAttribute('data-expanded', 'false');
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    var searchInput = document.getElementById('searchInput');
+    var statusFilter = document.getElementById('statusFilter');
+    if (searchInput) searchInput.addEventListener('input', applySearchAndFilter);
+    if (statusFilter) statusFilter.addEventListener('change', applySearchAndFilter);
+});
+</script>
+        
+</div>
+
+<!-- ===== Lightbox Modal ===== -->
+<div class="modal" id="lightboxModal">
+    <span id="closeModal">&#x2716;</span>
+    <img class="modal-content" id="lightboxImage" style="display:none;"/>
+    <video class="modal-content" id="lightboxVideo" controls style="display:none;"></video>
+</div>
+
+<!-- Floating tooltip for the Last 7 circles (body-level so it isn't clipped by table overflow) -->
+<div id="miniTooltip"></div>
+
+<script>
+/* ===== Navigation ===== */
+function showDetailedReport(moduleFilter) {
+    document.getElementById("summary-section").style.display = "none";
+    document.getElementById("detailed-section").style.display = "block";
+    window.scrollTo(0, 0);
+
+    // Apply module filter if provided, otherwise show all rows
+    var mainRows = document.querySelectorAll('#testcaseTable > tbody > tr:not(.details-row)');
+    mainRows.forEach(function(row) {
+        var rowModule = (row.getAttribute('data-module') || '').toUpperCase().trim();
+        var filterModule = moduleFilter ? moduleFilter.toUpperCase().trim() : '';
+        var shouldShow = !filterModule || rowModule === filterModule;
+        var testId = row.getAttribute('data-test-id');
+        var detailsRow = document.getElementById(testId + '-details');
+        if (shouldShow) {
+            row.style.display = '';
+            if (detailsRow) {
+                var expanded = row.getAttribute('data-expanded') === 'true';
+                detailsRow.style.display = expanded ? 'table-row' : 'none';
+            }
+        } else {
+            row.style.display = 'none';
+            if (detailsRow) detailsRow.style.display = 'none';
+        }
+    });
+
+    // Reset the search/filter controls to reflect no active text/status filter
+    var searchInput = document.getElementById('searchInput');
+    var statusFilter = document.getElementById('statusFilter');
+    if (searchInput) searchInput.value = '';
+    if (statusFilter) statusFilter.value = '';
+}
+function showSummaryReport() {
+    document.getElementById("detailed-section").style.display = "none";
+    document.getElementById("summary-section").style.display = "block";
+    window.scrollTo(0, 0);
+}
+
+/* ===== Doughnut Chart ===== */
+document.addEventListener('DOMContentLoaded', function() {
+    var ctx = document.getElementById('chart1');
+    if (ctx) {
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Passed', 'Failed', 'Skipped'],
+                datasets: [{
+                    data: [5, 2, 0],
+                    backgroundColor: ['#28a745', '#dc3545', '#ffc107']
+                }]
+            },
+            options: { plugins: { legend: { position: 'bottom' } } }
+        });
+    }
+    showSummaryReport();
+    populateModuleTable();
+});
+
+/* ===== Module Table ===== */
+var moduleDataRaw = "[{\"module\": \"AUDIENCE\", \"total\": 2, \"passed\": 2, \"failed\": 0, \"skipped\": 0, \"durationMillis\": 415642}, {\"module\": \"COMMUNICATION\", \"total\": 5, \"passed\": 3, \"failed\": 2, \"skipped\": 0, \"durationMillis\": 1944260}]";
+var moduleData = [];
+try { moduleData = JSON.parse(moduleDataRaw); } catch (e) { console.error('Failed to parse module data:', e); }
+
+function formatDuration(ms) {
+    if (!ms || ms <= 0) return '-';
+    var totalSeconds = Math.floor(ms / 1000);
+    var hours = Math.floor(totalSeconds / 3600);
+    var minutes = Math.floor((totalSeconds % 3600) / 60);
+    var seconds = totalSeconds % 60;
+    var pad = function(n) { return n.toString().padStart(2, '0'); };
+    return pad(hours) + ':' + pad(minutes) + ':' + pad(seconds);
+}
+
+function populateModuleTable() {
+    var tableBody = document.getElementById('moduleTableBody');
+    if (!tableBody) return;
+
+    if (!moduleData || moduleData.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#666;">No module data available</td></tr>';
+        return;
+    }
+
+    tableBody.innerHTML = moduleData.map(function(m) {
+        var successRate = m.total > 0 ? ((m.passed / m.total) * 100).toFixed(0) : '0';
+        var slaRate = 90;
+        var modName = (m.module || 'Unknown Module');
+        return '<tr class="module-summary-row" data-filter-module="' + modName + '" style="cursor:pointer;">'
+            + '<td>' + modName + '</td>'
+            + '<td>' + (m.total || 0) + '</td>'
+            + '<td>' + (m.passed || 0) + '</td>'
+            + '<td>' + (m.failed || 0) + '</td>'
+            + '<td>' + (m.skipped || 0) + '</td>'
+            + '<td>' + formatDuration(m.durationMillis || 0) + '</td>'
+            + '<td class="' + (slaRate >= 90 ? 'sla-pass' : 'sla-fail') + '">' + slaRate + '%</td>'
+            + '<td class="' + (successRate >= slaRate ? 'sla-pass' : 'sla-fail') + '">' + successRate + '%</td>'
+            + '</tr>';
+    }).join('');
+
+    // Attach click handlers after rows are in the DOM (avoids all inline-JS quoting issues)
+    document.querySelectorAll('.module-summary-row').forEach(function(row) {
+        row.addEventListener('click', function() {
+            showDetailedReport(this.getAttribute('data-filter-module'));
+        });
+    });
+}
+
+/* ===== Floating tooltip for Last 7 circles =====
+   Lives at body level so it is never clipped by .table-container's overflow.
+   Uses document-level event delegation so it works for dynamically rendered rows. */
+(function() {
+    var tip = document.getElementById('miniTooltip');
+    if (!tip) return;
+
+    function positionTip(target) {
+        var rect = target.getBoundingClientRect();
+        var tipRect = tip.getBoundingClientRect();
+        var left = rect.left + (rect.width / 2) - (tipRect.width / 2);
+        var top = rect.top - tipRect.height - 10;
+        var margin = 6;
+        if (left < margin) left = margin;
+        if (left + tipRect.width > window.innerWidth - margin) {
+            left = window.innerWidth - tipRect.width - margin;
+        }
+        if (top < margin) {
+            // not enough room above — show below
+            top = rect.bottom + 10;
+        }
+        tip.style.left = left + 'px';
+        tip.style.top = top + 'px';
+    }
+
+    document.addEventListener('mouseover', function(e) {
+        var el = e.target;
+        if (!el || !el.classList) return;
+        var isCircle = el.classList.contains('mini-circle');
+        var isDesc = el.classList.contains('desc-chip-tip');
+        if (!isCircle && !isDesc) return;
+        var text = el.getAttribute('data-tooltip');
+        if (!text) return;
+        tip.textContent = text;
+        tip.style.left = '-9999px';
+        tip.style.top = '-9999px';
+        tip.classList.add('show');
+        requestAnimationFrame(function() { positionTip(el); });
+    });
+
+    document.addEventListener('mouseout', function(e) {
+        var el = e.target;
+        if (!el || !el.classList) return;
+        if (!el.classList.contains('mini-circle') && !el.classList.contains('desc-chip-tip')) return;
+        tip.classList.remove('show');
+    });
+
+    window.addEventListener('scroll', function() {
+        tip.classList.remove('show');
+    }, true);
+})();
+
+/* ===== Lightbox (screenshot + video) ===== */
+document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('screenshot')) {
+        var modal = document.getElementById('lightboxModal');
+        var modalImg = document.getElementById('lightboxImage');
+        var modalVideo = document.getElementById('lightboxVideo');
+        if (modal && modalImg && modalVideo) {
+            modalVideo.style.display = 'none';
+            modalVideo.pause();
+            modalVideo.src = '';
+            modalImg.src = e.target.src;
+            modalImg.style.display = 'block';
+            modal.style.display = 'block';
+        }
+    }
+    if (e.target.id === 'closeModal' || e.target.classList.contains('modal')) {
+        var modal = document.getElementById('lightboxModal');
+        var modalVideo = document.getElementById('lightboxVideo');
+        if (modalVideo) { modalVideo.pause(); modalVideo.src = ''; }
+        if (modal) { modal.style.display = 'none'; }
+    }
+});
+</script>
+</body>
+</html>
