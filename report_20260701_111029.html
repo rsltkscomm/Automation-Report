@@ -1,0 +1,1412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>API Automation Test Report - team</title>
+<style>
+  :root {
+    --primary: #0f2f63;
+    --primary-dark: #021e49;
+    --primary-light: #1a4a8a;
+    --success: #10b981;
+    --danger: #ef4444;
+    --warning: #f59e0b;
+    --info: #3b82f6;
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-400: #9ca3af;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --gray-800: #1f2937;
+    --gray-900: #111827;
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: var(--gray-50);
+    color: var(--gray-900);
+    line-height: 1.5;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Header */
+  .header {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    color: white;
+    padding: 20px 32px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 20px;
+    position: relative;
+  }
+
+  .logo-left {
+    position: absolute;
+    left: 32px;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  .logo-right {
+    position: absolute;
+    right: 32px;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  .logo-left img, .logo-right img {
+    height: 45px;
+    object-fit: contain;
+  }
+
+  .header h1 {
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+    text-align: center;
+    margin: 0;
+  }
+
+  /* Info Bar */
+  .info-bar {
+    background: white;
+    padding: 12px 32px;
+    border-bottom: 1px solid var(--gray-200);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    font-size: 13px;
+    color: var(--gray-600);
+  }
+
+  .info-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .info-label {
+    font-weight: 600;
+    color: var(--gray-700);
+  }
+
+  /* Stats Grid */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    padding: 24px 32px;
+    background: white;
+    border-bottom: 1px solid var(--gray-200);
+  }
+
+  .stat-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--gray-200);
+    transition: all 0.2s;
+  }
+
+  .stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+
+  .stat-label {
+    font-size: 13px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--gray-600);
+    margin-bottom: 8px;
+  }
+
+  .stat-value {
+    font-size: 36px;
+    font-weight: 700;
+    color: var(--gray-900);
+  }
+
+  .stat-value.success { color: var(--success); }
+  .stat-value.danger { color: var(--danger); }
+  .stat-value.warning { color: var(--warning); }
+
+  .progress-bar-container {
+    background: var(--gray-200);
+    border-radius: 20px;
+    height: 8px;
+    overflow: hidden;
+    margin-top: 12px;
+  }
+
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--success), #34d399);
+    border-radius: 20px;
+    transition: width 0.5s ease;
+  }
+
+  /* Metrics Grid */
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    padding: 16px 32px;
+    background: var(--gray-50);
+    border-bottom: 1px solid var(--gray-200);
+  }
+
+  .metric-item {
+    text-align: center;
+  }
+
+  .metric-label {
+    font-size: 12px;
+    color: var(--gray-600);
+    margin-bottom: 4px;
+  }
+
+  .metric-value {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--primary);
+  }
+
+  /* Content Layout */
+  .content {
+    padding: 24px 32px;
+    flex: 1;
+  }
+
+  /* Panel Styles */
+  .panel {
+    background: white;
+    border-radius: 12px;
+    border: 1px solid var(--gray-200);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .panel-header {
+    background: var(--gray-100);
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--gray-200);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .panel-header h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--primary);
+    margin: 0;
+  }
+
+  .btn-group {
+    display: flex;
+    gap: 8px;
+  }
+
+  .btn {
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--gray-300);
+    background: white;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.2s;
+  }
+
+  .btn:hover {
+    background: var(--gray-100);
+    border-color: var(--gray-400);
+    transform: translateY(-1px);
+  }
+
+  /* Table Styles */
+  .table-wrapper {
+    overflow-x: auto;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+
+  th {
+    background: var(--gray-100);
+    padding: 12px 16px;
+    text-align: left;
+    font-weight: 600;
+    color: var(--gray-700);
+    border-bottom: 2px solid var(--gray-200);
+  }
+
+  td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--gray-200);
+    vertical-align: top;
+  }
+
+  .module-row {
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .module-row:hover {
+    background: #eff6ff;
+  }
+
+  .module-tests-row {
+    background: #f8fafc;
+  }
+
+  .module-tests-row td {
+    padding: 0;
+  }
+
+  .sub-table-container {
+    padding: 0;
+  }
+
+  .sub-table {
+    width: 100%;
+    margin: 0;
+    background: #f8fafc;
+  }
+
+  .sub-table th {
+    background: #e2e8f0;
+    padding: 10px 16px;
+    font-size: 13px;
+  }
+
+  .sub-table td {
+    padding: 10px 16px;
+    background: white;
+    border-bottom: 1px solid var(--gray-200);
+  }
+
+  .test-row {
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .test-row:hover {
+    background: #f1f5f9;
+  }
+
+  .steps-row {
+    display: none;
+  }
+
+  .steps-row td {
+    padding: 0;
+    background: #f1f5f9;
+  }
+
+  .toggle-cell, .test-toggle-cell {
+    width: 30px;
+    text-align: center;
+  }
+
+  .module-toggle, .test-toggle {
+    font-weight: bold;
+    color: var(--primary);
+    font-size: 14px;
+    cursor: pointer;
+    display: inline-block;
+  }
+
+  .module-name {
+    font-weight: 500;
+  }
+
+  .stat-number {
+    text-align: center;
+    font-weight: 500;
+  }
+
+  .progress-cell {
+    width: 80px;
+  }
+
+  .status-pass { color: var(--success); font-weight: 600; }
+  .status-fail { color: var(--danger); font-weight: 600; }
+  .status-skipped { color: var(--warning); font-weight: 600; }
+
+  .status-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .status-pass.status-badge {
+    background: #d1fae5;
+    color: #065f46;
+  }
+
+  .status-fail.status-badge {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+
+  .status-skipped.status-badge {
+    background: #fed7aa;
+    color: #92400e;
+  }
+
+  .steps-container {
+    margin: 16px;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--gray-200);
+  }
+
+  .steps-header {
+    background: var(--gray-100);
+    padding: 10px 16px;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--gray-700);
+    border-bottom: 1px solid var(--gray-200);
+  }
+
+  .steps-table {
+    width: 100%;
+    font-size: 13px;
+  }
+
+  .steps-table th {
+    background: #f1f5f9;
+    font-size: 12px;
+    padding: 8px 12px;
+  }
+
+  .steps-table td {
+    padding: 10px 12px;
+  }
+
+  .step-number {
+    width: 40px;
+    text-align: center;
+    font-weight: 600;
+    color: var(--gray-600);
+  }
+
+  .step-action {
+    font-weight: 500;
+  }
+
+  .step-expected, .step-actual {
+    color: var(--gray-600);
+    max-width: 300px;
+  }
+
+  .screenshot-link {
+    text-decoration: none;
+    font-size: 12px;
+    margin-left: 8px;
+  }
+
+  .testcase-id {
+    font-family: monospace;
+    background: var(--gray-100);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+
+  .testcase-id-cell {
+    min-width: 120px;
+  }
+
+  .description-cell {
+    max-width: 300px;
+  }
+
+  .duration-cell {
+    font-family: monospace;
+    color: var(--gray-600);
+    min-width: 80px;
+  }
+
+  /* Timeline */
+  .timeline {
+    padding: 16px;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+
+  .timeline-item {
+    display: flex;
+    gap: 12px;
+    padding: 12px 0;
+    border-left: 2px solid var(--gray-200);
+    margin-left: 16px;
+    padding-left: 24px;
+    position: relative;
+  }
+
+  .timeline-dot {
+    position: absolute;
+    left: -5px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    top: 18px;
+  }
+
+  .timeline-dot.pass { background: var(--success); box-shadow: 0 0 0 3px #d1fae5; }
+  .timeline-dot.fail { background: var(--danger); box-shadow: 0 0 0 3px #fee2e2; }
+  .timeline-dot.skip { background: var(--warning); box-shadow: 0 0 0 3px #fed7aa; }
+
+  .timeline-content {
+    flex: 1;
+  }
+
+  .timeline-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+
+  .timeline-status {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  .timeline-meta {
+    font-size: 12px;
+    color: var(--gray-600);
+  }
+
+  .trend-cell {
+    font-size: 12px;
+    min-width: 100px;
+  }
+
+  .mini-progress {
+    margin-top: 4px;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 40px;
+    color: var(--gray-600);
+  }
+
+  /* Footer */
+  .footer {
+    background: white;
+    border-top: 1px solid var(--gray-200);
+    padding: 16px 32px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--gray-600);
+    margin-top: auto;
+  }
+
+  /* Animations */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .panel {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  @media (max-width: 768px) {
+    .logo-left, .logo-right {
+      position: static;
+      transform: none;
+    }
+    .header {
+      flex-direction: column;
+      padding: 16px;
+    }
+    .info-bar {
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+    .stats-grid {
+      grid-template-columns: 1fr;
+    }
+    .metrics-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo-left">
+    <img src="https://www.resulticks.com/images/logos/resulticks-logo-blue.svg" alt="Company Logo">
+  </div>
+  <h1>API Automation Test Report</h1>
+  <div class="logo-right">
+    <img src="https://run19.resul.io/assets/resulticks-logo-white-391eec89.svg" alt="Product Logo">
+  </div>
+</div>
+
+<div class="info-bar">
+  <div class="info-item">
+    <span class="info-label">🌍 Environment:</span>
+    <span>team</span>
+  </div>
+  <div class="info-item">
+    <span class="info-label">📦 Release:</span>
+    <span>5.0</span>
+  </div>
+  <div class="info-item">
+    <span class="info-label">📅 Execution Date:</span>
+    <span>26-07-01 11:10:29</span>
+  </div>
+  <div class="info-item">
+    <span class="info-label">👤 Generated By:</span>
+    <span>mkstr250@marketingstar.in</span>
+  </div>
+</div>
+
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-label">Total APIs</div>
+    <div class="stat-value">14</div>
+    <div class="progress-bar-container">
+      <div class="progress-bar" style="width: 0.0%"></div>
+    </div>
+    <div class="stat-label" style="margin-top: 8px;">Pass Rate: 0.0%</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">✅ Passed</div>
+    <div class="stat-value success">0</div>
+    <div class="progress-bar-container">
+      <div class="progress-bar" style="width: 0.0%; background: var(--success);"></div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">❌ Failed</div>
+    <div class="stat-value danger">14</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">⏭️ Skipped</div>
+    <div class="stat-value warning">0</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">⏱️ Total Duration</div>
+    <div class="stat-value">00:01:45</div>
+  </div>
+</div>
+
+
+
+<div class="content">
+  <!-- API Module Summary Panel -->
+  <div class="panel">
+    <div class="panel-header">
+      <h3>📊 API Module Summary</h3>
+      <div class="btn-group">
+        <button class="btn" onclick="exportToCSV()">📥 Export CSV</button>
+      </div>
+    </div>
+    <div class="table-wrapper">
+      <table id="main-table">
+        <thead>
+          <tr>
+            <th style="width: 30px;"></th>
+            <th>Module</th>
+            <th>Total</th>
+            <th>✅ Passed</th>
+            <th>❌ Failed</th>
+            <th>⏭️ Skipped</th>
+            <th>⏱️ Duration</th>
+            <th>📈 Pass %</th>
+            <th>📊 Trend</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="main-table-body">
+          
+        <tr class="module-row" data-module="1">
+            <td class="toggle-cell"><span class="module-toggle" id="module-toggle-1">▶</span></td>
+            <td class="module-name"><strong>API - ADMIN CONSOLE LOGIN AUTHENTICATION</strong></td>
+            <td class="stat-number">1</td>
+            <td class="status-pass stat-number">0</td>
+            <td class="status-fail stat-number">1</td>
+            <td class="status-skipped stat-number">0</td>
+            <td class="stat-number">-</td>
+            <td class="stat-number"><strong>0.0%</strong></td>
+            <td class="trend-cell"><small>📊 First run</small></td>
+            <td class="progress-cell"><div class="mini-progress" style="width:0.0%;background:#10b981;height:4px;border-radius:2px;"></div></td>
+        </tr>
+        
+            <tr id="module-tests-1" class="module-tests-row" style="display: none;">
+                <td colspan="10">
+                    <div class="sub-table-container">
+                        <table class="sub-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 30px;"></th>
+                                    <th style="width: 30px;"></th>
+                                    <th>Test Case ID</th>
+                                    <th>Description</th>
+                                    <th>Status</th>
+                                    <th>Duration</th>
+                                    <th></th><th></th><th></th><th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                <tr class="test-row" data-test="1-1">
+                    <td class="test-toggle-cell"><span class="test-toggle" id="test-toggle-1-1">▶</span></td>
+                    <td style="width: 30px;"></td>
+                    <td class="testcase-id-cell"><code class="testcase-id">Verify_successful_login_authentication_using_OTP</code></td>
+                    <td class="description-cell">Verify successful login authentication using OTP </td>
+                    <td class="status-fail status-badge">FAIL</td>
+                    <td class="duration-cell">-</td>
+                    <td></td><td><td><td><td></td>
+                </tr>
+                
+                <tr id="steps-1-1" class="steps-row" style="display: none;">
+                    <td colspan="10">
+                        <div class="steps-container">
+                            <div class="steps-header">📋 Test Steps</div>
+                            <table class="steps-table">
+                                <thead>
+                                    <tr><th>#</th><th>API Step</th><th>Expected Result</th><th>Actual Result / Error</th><th>Status</th></tr>
+                                </thead>
+                                <tbody>
+                        <tr>
+                            <td class="step-number">1</td>
+                            <td class="step-action"><strong>Hit the login request and get the accesstoken</strong></td>
+                            <td class="step-expected"></td>
+                            <td class="step-actual">Invalid URL &#39;NoneHome/LoginValidate&#39;: No scheme supplied. Perhaps you meant https://NoneHome/LoginValidate?</td>
+                            <td class="status-fail">FAIL</td>
+                        </tr>
+                        </tbody>
+                            </table>
+                        </div>
+                    </td>
+                </tr>
+                </tbody>
+                        </table>
+                    </div>
+                </td>
+            </tr>
+            
+        <tr class="module-row" data-module="2">
+            <td class="toggle-cell"><span class="module-toggle" id="module-toggle-2">▶</span></td>
+            <td class="module-name"><strong>API - CONNECTOR API VALIDATION</strong></td>
+            <td class="stat-number">13</td>
+            <td class="status-pass stat-number">0</td>
+            <td class="status-fail stat-number">13</td>
+            <td class="status-skipped stat-number">0</td>
+            <td class="stat-number">-</td>
+            <td class="stat-number"><strong>0.0%</strong></td>
+            <td class="trend-cell"><small>📊 First run</small></td>
+            <td class="progress-cell"><div class="mini-progress" style="width:0.0%;background:#10b981;height:4px;border-radius:2px;"></div></td>
+        </tr>
+        
+            <tr id="module-tests-2" class="module-tests-row" style="display: none;">
+                <td colspan="10">
+                    <div class="sub-table-container">
+                        <table class="sub-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 30px;"></th>
+                                    <th style="width: 30px;"></th>
+                                    <th>Test Case ID</th>
+                                    <th>Description</th>
+                                    <th>Status</th>
+                                    <th>Duration</th>
+                                    <th></th><th></th><th></th><th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                <tr class="test-row" data-test="2-1">
+                    <td class="test-toggle-cell"><span class="test-toggle" id="test-toggle-2-1">▶</span></td>
+                    <td style="width: 30px;"></td>
+                    <td class="testcase-id-cell"><code class="testcase-id">Validate_connector_APIs_Shopify</code></td>
+                    <td class="description-cell">Validate connector APIs Shopify </td>
+                    <td class="status-fail status-badge">FAIL</td>
+                    <td class="duration-cell">-</td>
+                    <td></td><td><td><td><td></td>
+                </tr>
+                
+                <tr id="steps-2-1" class="steps-row" style="display: none;">
+                    <td colspan="10">
+                        <div class="steps-container">
+                            <div class="steps-header">📋 Test Steps</div>
+                            <table class="steps-table">
+                                <thead>
+                                    <tr><th>#</th><th>API Step</th><th>Expected Result</th><th>Actual Result / Error</th><th>Status</th></tr>
+                                </thead>
+                                <tbody>
+                        <tr>
+                            <td class="step-number">1</td>
+                            <td class="step-action"><strong>Hit the login request and get the accesstoken</strong></td>
+                            <td class="step-expected"></td>
+                            <td class="step-actual">Invalid URL &#39;NoneHome/LoginValidate&#39;: No scheme supplied. Perhaps you meant https://NoneHome/LoginValidate?</td>
+                            <td class="status-fail">FAIL</td>
+                        </tr>
+                        </tbody>
+                            </table>
+                        </div>
+                    </td>
+                </tr>
+                
+                <tr class="test-row" data-test="2-2">
+                    <td class="test-toggle-cell"><span class="test-toggle" id="test-toggle-2-2">▶</span></td>
+                    <td style="width: 30px;"></td>
+                    <td class="testcase-id-cell"><code class="testcase-id">Validate_connector_APIs_BigQuery</code></td>
+                    <td class="description-cell">Validate connector APIs BigQuery </td>
+                    <td class="status-fail status-badge">FAIL</td>
+                    <td class="duration-cell">-</td>
+                    <td></td><td><td><td><td></td>
+                </tr>
+                
+                <tr id="steps-2-2" class="steps-row" style="display: none;">
+                    <td colspan="10">
+                        <div class="steps-container">
+                            <div class="steps-header">📋 Test Steps</div>
+                            <table class="steps-table">
+                                <thead>
+                                    <tr><th>#</th><th>API Step</th><th>Expected Result</th><th>Actual Result / Error</th><th>Status</th></tr>
+                                </thead>
+                                <tbody>
+                        <tr>
+                            <td class="step-number">1</td>
+                            <td class="step-action"><strong>Hit the login request and get the accesstoken</strong></td>
+                            <td class="step-expected"></td>
+                            <td class="step-actual">Invalid URL &#39;NoneHome/LoginValidate&#39;: No scheme supplied. Perhaps you meant https://NoneHome/LoginValidate?</td>
+                            <td class="status-fail">FAIL</td>
+                        </tr>
+                        </tbody>
+                            </table>
+                        </div>
+                    </td>
+                </tr>
+                
+                <tr class="test-row" data-test="2-3">
+                    <td class="test-toggle-cell"><span class="test-toggle" id="test-toggle-2-3">▶</span></td>
+                    <td style="width: 30px;"></td>
+                    <td class="testcase-id-cell"><code class="testcase-id">Validate_connector_APIs_Salesforce</code></td>
+                    <td class="description-cell">Validate connector APIs Salesforce </td>
+                    <td class="status-fail status-badge">FAIL</td>
+                    <td class="duration-cell">-</td>
+                    <td></td><td><td><td><td></td>
+                </tr>
+                
+                <tr id="steps-2-3" class="steps-row" style="display: none;">
+                    <td colspan="10">
+                        <div class="steps-container">
+                            <div class="steps-header">📋 Test Steps</div>
+                            <table class="steps-table">
+                                <thead>
+                                    <tr><th>#</th><th>API Step</th><th>Expected Result</th><th>Actual Result / Error</th><th>Status</th></tr>
+                                </thead>
+                                <tbody>
+                        <tr>
+                            <td class="step-number">1</td>
+                            <td class="step-action"><strong>Hit the login request and get the accesstoken</strong></td>
+                            <td class="step-expected"></td>
+                            <td class="step-actual">Invalid URL &#39;NoneHome/LoginValidate&#39;: No scheme supplied. Perhaps you meant https://NoneHome/LoginValidate?</td>
+                            <td class="status-fail">FAIL</td>
+                        </tr>
+                        </tbody>
+                            </table>
+                        </div>
+                    </td>
+                </tr>
+                
+                <tr class="test-row" data-test="2-4">
+                    <td class="test-toggle-cell"><span class="test-toggle" id="test-toggle-2-4">▶</span></td>
+                    <td style="width: 30px;"></td>
+                    <td class="testcase-id-cell"><code class="testcase-id">Validate_connector_APIs_Aerospike</code></td>
+                    <td class="description-cell">Validate connector APIs Aerospike </td>
+                    <td class="status-fail status-badge">FAIL</td>
+                    <td class="duration-cell">-</td>
+                    <td></td><td><td><td><td></td>
+                </tr>
+                
+                <tr id="steps-2-4" class="steps-row" style="display: none;">
+                    <td colspan="10">
+                        <div class="steps-container">
+                            <div class="steps-header">📋 Test Steps</div>
+                            <table class="steps-table">
+                                <thead>
+                                    <tr><th>#</th><th>API Step</th><th>Expected Result</th><th>Actual Result / Error</th><th>Status</th></tr>
+                                </thead>
+                                <tbody>
+                        <tr>
+                            <td class="step-number">1</td>
+                            <td class="step-action"><strong>Hit the login request and get the accesstoken</strong></td>
+                            <td class="step-expected"></td>
+                            <td class="step-actual">Invalid URL &#39;NoneHome/LoginValidate&#39;: No scheme supplied. Perhaps you meant https://NoneHome/LoginValidate?</td>
+                            <td class="status-fail">FAIL</td>
+                        </tr>
+                        </tbody>
+                            </table>
+                        </div>
+                    </td>
+                </tr>
+                
+                <tr class="test-row" data-test="2-5">
+                    <td class="test-toggle-cell"><span class="test-toggle" id="test-toggle-2-5">▶</span></td>
+                    <td style="width: 30px;"></td>
+                    <td class="testcase-id-cell"><code class="testcase-id">Validate_connector_APIs_Cassandra</code></td>
+                    <td class="description-cell">Validate connector APIs Cassandra </td>
+                    <td class="status-fail status-badge">FAIL</td>
+                    <td class="duration-cell">-</td>
+                    <td></td><td><td><td><td></td>
+                </tr>
+                
+                <tr id="steps-2-5" class="steps-row" style="display: none;">
+                    <td colspan="10">
+                        <div class="steps-container">
+                            <div class="steps-header">📋 Test Steps</div>
+                            <table class="steps-table">
+                                <thead>
+                                    <tr><th>#</th><th>API Step</th><th>Expected Result</th><th>Actual Result / Error</th><th>Status</th></tr>
+                                </thead>
+                                <tbody>
+                        <tr>
+                            <td class="step-number">1</td>
+                            <td class="step-action"><strong>Hit the login request and get the accesstoken</strong></td>
+                            <td class="step-expected"></td>
+                            <td class="step-actual">Invalid URL &#39;NoneHome/LoginValidate&#39;: No scheme supplied. Perhaps you meant https://NoneHome/LoginValidate?</td>
+                            <td class="status-fail">FAIL</td>
+                        </tr>
+                        </tbody>
+                            </table>
+                        </div>
+                    </td>
+                </tr>
+                
+                <tr class="test-row" data-test="2-6">
+                    <td class="test-toggle-cell"><span class="test-toggle" id="test-toggle-2-6">▶</span></td>
+                    <td style="width: 30px;"></td>
+                    <td class="testcase-id-cell"><code class="testcase-id">Validate_connector_APIs_DynamicCRM</code></td>
+                    <td class="description-cell">Validate connector APIs DynamicCRM </td>
+                    <td class="status-fail status-badge">FAIL</td>
+                    <td class="duration-cell">-</td>
+                    <td></td><td><td><td><td></td>
+                </tr>
+                
+                <tr id="steps-2-6" class="steps-row" style="display: none;">
+                    <td colspan="10">
+                        <div class="steps-container">
+                            <div class="steps-header">📋 Test Steps</div>
+                            <table class="steps-table">
+                                <thead>
+                                    <tr><th>#</th><th>API Step</th><th>Expected Result</th><th>Actual Result / Error</th><th>Status</th></tr>
+                                </thead>
+                                <tbody>
+                        <tr>
+                            <td class="step-number">1</td>
+                            <td class="step-action"><strong>Hit the login request and get the accesstoken</strong></td>
+                            <td class="step-expected"></td>
+                            <td class="step-actual">Invalid URL &#39;NoneHome/LoginValidate&#39;: No scheme supplied. Perhaps you meant https://NoneHome/LoginValidate?</td>
+                            <td class="status-fail">FAIL</td>
+                        </tr>
+                        </tbody>
+                            </table>
+                        </div>
+                    </td>
+                </tr>
+                
+                <tr class="test-row" data-test="2-7">
+                    <td class="test-toggle-cell"><span class="test-toggle" id="test-toggle-2-7">▶</span></td>
+                    <td style="width: 30px;"></td>
+                    <td class="testcase-id-cell"><code class="testcase-id">Validate_connector_APIs_HubSpot</code></td>
+                    <td class="description-cell">Validate connector APIs HubSpot </td>
+                    <td class="status-fail status-badge">FAIL</td>
+                    <td class="duration-cell">-</td>
+                    <td></td><td><td><td><td></td>
+                </tr>
+                
+                <tr id="steps-2-7" class="steps-row" style="display: none;">
+                    <td colspan="10">
+                        <div class="steps-container">
+                            <div class="steps-header">📋 Test Steps</div>
+                            <table class="steps-table">
+                                <thead>
+                                    <tr><th>#</th><th>API Step</th><th>Expected Result</th><th>Actual Result / Error</th><th>Status</th></tr>
+                                </thead>
+                                <tbody>
+                        <tr>
+                            <td class="step-number">1</td>
+                            <td class="step-action"><strong>Hit the login request and get the accesstoken</strong></td>
+                            <td class="step-expected"></td>
+                            <td class="step-actual">Invalid URL &#39;NoneHome/LoginValidate&#39;: No scheme supplied. Perhaps you meant https://NoneHome/LoginValidate?</td>
+                            <td class="status-fail">FAIL</td>
+                        </tr>
+                        </tbody>
+                            </table>
+                        </div>
+                    </td>
+                </tr>
+                
+                <tr class="test-row" data-test="2-8">
+                    <td class="test-toggle-cell"><span class="test-toggle" id="test-toggle-2-8">▶</span></td>
+                    <td style="width: 30px;"></td>
+                    <td class="testcase-id-cell"><code class="testcase-id">Validate_connector_APIs_Wix</code></td>
+                    <td class="description-cell">Validate connector APIs Wix </td>
+                    <td class="status-fail status-badge">FAIL</td>
+                    <td class="duration-cell">-</td>
+                    <td></td><td><td><td><td></td>
+                </tr>
+                
+                <tr id="steps-2-8" class="steps-row" style="display: none;">
+                    <td colspan="10">
+                        <div class="steps-container">
+                            <div class="steps-header">📋 Test Steps</div>
+                            <table class="steps-table">
+                                <thead>
+                                    <tr><th>#</th><th>API Step</th><th>Expected Result</th><th>Actual Result / Error</th><th>Status</th></tr>
+                                </thead>
+                                <tbody>
+                        <tr>
+                            <td class="step-number">1</td>
+                            <td class="step-action"><strong>Hit the login request and get the accesstoken</strong></td>
+                            <td class="step-expected"></td>
+                            <td class="step-actual">Invalid URL &#39;NoneHome/LoginValidate&#39;: No scheme supplied. Perhaps you meant https://NoneHome/LoginValidate?</td>
+                            <td class="status-fail">FAIL</td>
+                        </tr>
+                        </tbody>
+                            </table>
+                        </div>
+                    </td>
+                </tr>
+                
+                <tr class="test-row" data-test="2-9">
+                    <td class="test-toggle-cell"><span class="test-toggle" id="test-toggle-2-9">▶</span></td>
+                    <td style="width: 30px;"></td>
+                    <td class="testcase-id-cell"><code class="testcase-id">Validate_connector_APIs_Postgresql</code></td>
+                    <td class="description-cell">Validate connector APIs Postgresql </td>
+                    <td class="status-fail status-badge">FAIL</td>
+                    <td class="duration-cell">-</td>
+                    <td></td><td><td><td><td></td>
+                </tr>
+                
+                <tr id="steps-2-9" class="steps-row" style="display: none;">
+                    <td colspan="10">
+                        <div class="steps-container">
+                            <div class="steps-header">📋 Test Steps</div>
+                            <table class="steps-table">
+                                <thead>
+                                    <tr><th>#</th><th>API Step</th><th>Expected Result</th><th>Actual Result / Error</th><th>Status</th></tr>
+                                </thead>
+                                <tbody>
+                        <tr>
+                            <td class="step-number">1</td>
+                            <td class="step-action"><strong>Hit the login request and get the accesstoken</strong></td>
+                            <td class="step-expected"></td>
+                            <td class="step-actual">Invalid URL &#39;NoneHome/LoginValidate&#39;: No scheme supplied. Perhaps you meant https://NoneHome/LoginValidate?</td>
+                            <td class="status-fail">FAIL</td>
+                        </tr>
+                        </tbody>
+                            </table>
+                        </div>
+                    </td>
+                </tr>
+                
+                <tr class="test-row" data-test="2-10">
+                    <td class="test-toggle-cell"><span class="test-toggle" id="test-toggle-2-10">▶</span></td>
+                    <td style="width: 30px;"></td>
+                    <td class="testcase-id-cell"><code class="testcase-id">Validate_connector_APIs_MongoDB</code></td>
+                    <td class="description-cell">Validate connector APIs MongoDB </td>
+                    <td class="status-fail status-badge">FAIL</td>
+                    <td class="duration-cell">-</td>
+                    <td></td><td><td><td><td></td>
+                </tr>
+                
+                <tr id="steps-2-10" class="steps-row" style="display: none;">
+                    <td colspan="10">
+                        <div class="steps-container">
+                            <div class="steps-header">📋 Test Steps</div>
+                            <table class="steps-table">
+                                <thead>
+                                    <tr><th>#</th><th>API Step</th><th>Expected Result</th><th>Actual Result / Error</th><th>Status</th></tr>
+                                </thead>
+                                <tbody>
+                        <tr>
+                            <td class="step-number">1</td>
+                            <td class="step-action"><strong>Hit the login request and get the accesstoken</strong></td>
+                            <td class="step-expected"></td>
+                            <td class="step-actual">Invalid URL &#39;NoneHome/LoginValidate&#39;: No scheme supplied. Perhaps you meant https://NoneHome/LoginValidate?</td>
+                            <td class="status-fail">FAIL</td>
+                        </tr>
+                        </tbody>
+                            </table>
+                        </div>
+                    </td>
+                </tr>
+                
+                <tr class="test-row" data-test="2-11">
+                    <td class="test-toggle-cell"><span class="test-toggle" id="test-toggle-2-11">▶</span></td>
+                    <td style="width: 30px;"></td>
+                    <td class="testcase-id-cell"><code class="testcase-id">validate_shopify_connector_api_returns_400_when_mandatory_field_is_empty</code></td>
+                    <td class="description-cell">validate shopify connector api returns 400 when mandatory field is empty </td>
+                    <td class="status-fail status-badge">FAIL</td>
+                    <td class="duration-cell">-</td>
+                    <td></td><td><td><td><td></td>
+                </tr>
+                
+                <tr id="steps-2-11" class="steps-row" style="display: none;">
+                    <td colspan="10">
+                        <div class="steps-container">
+                            <div class="steps-header">📋 Test Steps</div>
+                            <table class="steps-table">
+                                <thead>
+                                    <tr><th>#</th><th>API Step</th><th>Expected Result</th><th>Actual Result / Error</th><th>Status</th></tr>
+                                </thead>
+                                <tbody>
+                        <tr>
+                            <td class="step-number">1</td>
+                            <td class="step-action"><strong>Hit the login request and get the accesstoken</strong></td>
+                            <td class="step-expected"></td>
+                            <td class="step-actual">Invalid URL &#39;NoneHome/LoginValidate&#39;: No scheme supplied. Perhaps you meant https://NoneHome/LoginValidate?</td>
+                            <td class="status-fail">FAIL</td>
+                        </tr>
+                        </tbody>
+                            </table>
+                        </div>
+                    </td>
+                </tr>
+                
+                <tr class="test-row" data-test="2-12">
+                    <td class="test-toggle-cell"><span class="test-toggle" id="test-toggle-2-12">▶</span></td>
+                    <td style="width: 30px;"></td>
+                    <td class="testcase-id-cell"><code class="testcase-id">validate_Wix_connector_api_returns_400_when_mandatory_field_is_empty</code></td>
+                    <td class="description-cell">validate Wix connector api returns 400 when mandatory field is empty </td>
+                    <td class="status-fail status-badge">FAIL</td>
+                    <td class="duration-cell">-</td>
+                    <td></td><td><td><td><td></td>
+                </tr>
+                
+                <tr id="steps-2-12" class="steps-row" style="display: none;">
+                    <td colspan="10">
+                        <div class="steps-container">
+                            <div class="steps-header">📋 Test Steps</div>
+                            <table class="steps-table">
+                                <thead>
+                                    <tr><th>#</th><th>API Step</th><th>Expected Result</th><th>Actual Result / Error</th><th>Status</th></tr>
+                                </thead>
+                                <tbody>
+                        <tr>
+                            <td class="step-number">1</td>
+                            <td class="step-action"><strong>Hit the login request and get the accesstoken</strong></td>
+                            <td class="step-expected"></td>
+                            <td class="step-actual">Invalid URL &#39;NoneHome/LoginValidate&#39;: No scheme supplied. Perhaps you meant https://NoneHome/LoginValidate?</td>
+                            <td class="status-fail">FAIL</td>
+                        </tr>
+                        </tbody>
+                            </table>
+                        </div>
+                    </td>
+                </tr>
+                
+                <tr class="test-row" data-test="2-13">
+                    <td class="test-toggle-cell"><span class="test-toggle" id="test-toggle-2-13">▶</span></td>
+                    <td style="width: 30px;"></td>
+                    <td class="testcase-id-cell"><code class="testcase-id">validate_Cassandra_connector_api_returns_400_when_mandatory_field_is_empty</code></td>
+                    <td class="description-cell">validate Cassandra connector api returns 400 when mandatory field is empty </td>
+                    <td class="status-fail status-badge">FAIL</td>
+                    <td class="duration-cell">-</td>
+                    <td></td><td><td><td><td></td>
+                </tr>
+                
+                <tr id="steps-2-13" class="steps-row" style="display: none;">
+                    <td colspan="10">
+                        <div class="steps-container">
+                            <div class="steps-header">📋 Test Steps</div>
+                            <table class="steps-table">
+                                <thead>
+                                    <tr><th>#</th><th>API Step</th><th>Expected Result</th><th>Actual Result / Error</th><th>Status</th></tr>
+                                </thead>
+                                <tbody>
+                        <tr>
+                            <td class="step-number">1</td>
+                            <td class="step-action"><strong>Hit the login request and get the accesstoken</strong></td>
+                            <td class="step-expected"></td>
+                            <td class="step-actual">Invalid URL &#39;NoneHome/LoginValidate&#39;: No scheme supplied. Perhaps you meant https://NoneHome/LoginValidate?</td>
+                            <td class="status-fail">FAIL</td>
+                        </tr>
+                        </tbody>
+                            </table>
+                        </div>
+                    </td>
+                </tr>
+                </tbody>
+                        </table>
+                    </div>
+                </td>
+            </tr>
+            </tbody>
+       </div>
+    </div>
+  </div>
+
+  <!-- Execution Timeline -->
+  <div class="panel" style="margin-top: 24px;">
+    <div class="panel-header">
+      <h3>⏱️ Execution Timeline (Last 10 Tests)</h3>
+    </div>
+    <div class="timeline">
+      
+            <div class="timeline-item">
+                <div class="timeline-dot fail"></div>
+                <div class="timeline-content">
+                    <div class="timeline-title">
+                        <strong>Validate_connector_APIs_Aerospike</strong>
+                        <span class="timeline-status status-fail">FAIL</span>
+                    </div>
+                    <div class="timeline-meta">
+                        API - Connector API Validation • -
+                    </div>
+                </div>
+            </div>
+            
+            <div class="timeline-item">
+                <div class="timeline-dot fail"></div>
+                <div class="timeline-content">
+                    <div class="timeline-title">
+                        <strong>Validate_connector_APIs_Cassandra</strong>
+                        <span class="timeline-status status-fail">FAIL</span>
+                    </div>
+                    <div class="timeline-meta">
+                        API - Connector API Validation • -
+                    </div>
+                </div>
+            </div>
+            
+            <div class="timeline-item">
+                <div class="timeline-dot fail"></div>
+                <div class="timeline-content">
+                    <div class="timeline-title">
+                        <strong>Validate_connector_APIs_DynamicCRM</strong>
+                        <span class="timeline-status status-fail">FAIL</span>
+                    </div>
+                    <div class="timeline-meta">
+                        API - Connector API Validation • -
+                    </div>
+                </div>
+            </div>
+            
+            <div class="timeline-item">
+                <div class="timeline-dot fail"></div>
+                <div class="timeline-content">
+                    <div class="timeline-title">
+                        <strong>Validate_connector_APIs_HubSpot</strong>
+                        <span class="timeline-status status-fail">FAIL</span>
+                    </div>
+                    <div class="timeline-meta">
+                        API - Connector API Validation • -
+                    </div>
+                </div>
+            </div>
+            
+            <div class="timeline-item">
+                <div class="timeline-dot fail"></div>
+                <div class="timeline-content">
+                    <div class="timeline-title">
+                        <strong>Validate_connector_APIs_Wix</strong>
+                        <span class="timeline-status status-fail">FAIL</span>
+                    </div>
+                    <div class="timeline-meta">
+                        API - Connector API Validation • -
+                    </div>
+                </div>
+            </div>
+            
+            <div class="timeline-item">
+                <div class="timeline-dot fail"></div>
+                <div class="timeline-content">
+                    <div class="timeline-title">
+                        <strong>Validate_connector_APIs_Postgresql</strong>
+                        <span class="timeline-status status-fail">FAIL</span>
+                    </div>
+                    <div class="timeline-meta">
+                        API - Connector API Validation • -
+                    </div>
+                </div>
+            </div>
+            
+            <div class="timeline-item">
+                <div class="timeline-dot fail"></div>
+                <div class="timeline-content">
+                    <div class="timeline-title">
+                        <strong>Validate_connector_APIs_MongoDB</strong>
+                        <span class="timeline-status status-fail">FAIL</span>
+                    </div>
+                    <div class="timeline-meta">
+                        API - Connector API Validation • -
+                    </div>
+                </div>
+            </div>
+            
+            <div class="timeline-item">
+                <div class="timeline-dot fail"></div>
+                <div class="timeline-content">
+                    <div class="timeline-title">
+                        <strong>validate_shopify_connector_api_returns_400_when_mandatory_field_is_empty</strong>
+                        <span class="timeline-status status-fail">FAIL</span>
+                    </div>
+                    <div class="timeline-meta">
+                        API - Connector API Validation • -
+                    </div>
+                </div>
+            </div>
+            
+            <div class="timeline-item">
+                <div class="timeline-dot fail"></div>
+                <div class="timeline-content">
+                    <div class="timeline-title">
+                        <strong>validate_Wix_connector_api_returns_400_when_mandatory_field_is_empty</strong>
+                        <span class="timeline-status status-fail">FAIL</span>
+                    </div>
+                    <div class="timeline-meta">
+                        API - Connector API Validation • -
+                    </div>
+                </div>
+            </div>
+            
+            <div class="timeline-item">
+                <div class="timeline-dot fail"></div>
+                <div class="timeline-content">
+                    <div class="timeline-title">
+                        <strong>validate_Cassandra_connector_api_returns_400_when_mandatory_field_is_empty</strong>
+                        <span class="timeline-status status-fail">FAIL</span>
+                    </div>
+                    <div class="timeline-meta">
+                        API - Connector API Validation • -
+                    </div>
+                </div>
+            </div>
+            
+    </div>
+  </div>
+</div>
+
+<script>
+  (function() {
+    // Function to toggle module expansion
+    function toggleModule(moduleRow) {
+      var moduleId = moduleRow.getAttribute('data-module');
+      if (!moduleId) return;
+
+      var testsRow = document.getElementById('module-tests-' + moduleId);
+      var toggleSpan = document.getElementById('module-toggle-' + moduleId);
+
+      if (testsRow) {
+        if (testsRow.style.display === 'none' || testsRow.style.display === '') {
+          testsRow.style.display = 'table-row';
+          if (toggleSpan) toggleSpan.innerHTML = '▼';
+        } else {
+          testsRow.style.display = 'none';
+          if (toggleSpan) toggleSpan.innerHTML = '▶';
+        }
+      }
+    }
+
+    // Function to toggle test expansion
+    function toggleTest(testRow) {
+      var testId = testRow.getAttribute('data-test');
+      if (!testId) return;
+
+      var stepsRow = document.getElementById('steps-' + testId);
+      var toggleSpan = document.getElementById('test-toggle-' + testId);
+
+      if (stepsRow) {
+        if (stepsRow.style.display === 'none' || stepsRow.style.display === '') {
+          stepsRow.style.display = 'table-row';
+          if (toggleSpan) toggleSpan.innerHTML = '▼';
+        } else {
+          stepsRow.style.display = 'none';
+          if (toggleSpan) toggleSpan.innerHTML = '▶';
+        }
+      }
+    }
+
+    // Attach event listeners to module rows
+    var moduleRows = document.querySelectorAll('.module-row');
+    for (var i = 0; i < moduleRows.length; i++) {
+      (function(row) {
+        row.addEventListener('click', function(e) {
+          e.stopPropagation();
+          toggleModule(row);
+        });
+      })(moduleRows[i]);
+    }
+
+    // Attach event listeners to test rows
+    var testRows = document.querySelectorAll('.test-row');
+    for (var i = 0; i < testRows.length; i++) {
+      (function(row) {
+        row.addEventListener('click', function(e) {
+          e.stopPropagation();
+          toggleTest(row);
+        });
+      })(testRows[i]);
+    }
+  })();
+
+  function exportToCSV() {
+    var csv = [];
+    var rows = document.querySelectorAll('#main-table tr');
+
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      var cols = row.querySelectorAll('th, td');
+      var rowData = [];
+      for (var j = 0; j < cols.length; j++) {
+        var col = cols[j];
+        var text = col.innerText.replace(/,/g, ';').replace(/\n/g, ' ').trim();
+        rowData.push('"' + text + '"');
+      }
+      if (rowData.length > 0 && rowData.join(',') !== '""') {
+        csv.push(rowData.join(','));
+      }
+    }
+
+    var blob = new Blob([csv.join('\n')], { type: 'text/csv' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'module_summary_' + new Date().toISOString().slice(0,19) + '.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+</script>
+</body>
+</html>
