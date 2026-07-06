@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Automation Test Summary Report</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+/* ===== Last 7 inline circles (replaces the old History popup) ===== */
+.last7-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    width: 100%;
+}
+.mini-circle {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    color: #fff;
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 13px;
+    line-height: 1;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.18);
+    cursor: default;
+    transition: transform 0.15s ease;
+}
+.mini-circle:hover {
+    transform: scale(1.2);
+    z-index: 20;
+}
+.mini-pass { background: linear-gradient(135deg, #22c55e, #16a34a); }
+.mini-fail { background: linear-gradient(135deg, #ef4444, #dc2626); }
+.mini-skip { background: linear-gradient(135deg, #fbbf24, #f59e0b); }
+
+.th-last7 { text-align: center !important; }
+.td-last7 {
+    white-space: nowrap;
+    text-align: center;
+    overflow: visible !important;
+    padding: 8px 4px !important;
+    display: table-cell;
+    vertical-align: middle;
+}
+.last7-row {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 4px;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+}
+
+/* Floating tooltip lives in <body> so it can't be clipped by .table-container overflow */
+#miniTooltip {
+    position: fixed;
+    background: #1e293b;
+    color: #fff;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-family: 'Segoe UI', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.1px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-width: 280px;
+    text-align: center;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    z-index: 99999;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+    line-height: 1.45;
+}
+#miniTooltip.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+#miniTooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 7px solid transparent;
+    border-top-color: #1e293b;
+}
+
+/* ===== General Layout ===== */
+body { font-family: 'Segoe UI', sans-serif; background:#f0f4fa; margin:0; color:#333; }
+.header { display:flex; justify-content:space-between; align-items:center; background:linear-gradient(33deg,#8db5f1,#021e49); color:white; padding:10px 20px; }
+.header img { height:40px; }
+.summary-band { background:#0e4494; color:white; display:flex; justify-content:center; gap:30px; padding:8px; font-weight:600; flex-wrap:wrap; }
+.summary-band div { display:flex; align-items:center; gap:5px; }
+.main { display:flex; gap:20px; padding:20px; flex-wrap:wrap; }
+.chart-container { flex:1; display:flex; justify-content:center; align-items:center; min-width:250px; }
+.table-container { flex:1; background:white; padding:15px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.1); overflow-x:hidden; box-sizing:border-box; min-width:300px; width:100%; }
+.table-container table { width:100%; border-collapse:collapse; }
+.table-container th, .table-container td { padding:8px; border-bottom:1px solid #eee; text-align:left; }
+.table-container th { background:#002b6b; color:white; }
+.table-container tbody tr { transition: background 0.15s; cursor: pointer; }
+.table-container tbody tr:hover { background: #eaf2ff !important; box-shadow: inset 3px 0 0 #1a6fd4; }
+.footer { text-align:center; font-size:0.8em; padding:10px; background:#f1f1f1; margin-top:20px; }
+.detailed-section { display: none; }
+
+/* ===== Detail Table ===== */
+#testcaseTable {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 1em;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 16px rgba(14,68,148,0.10);
+}
+#testcaseTable thead tr {
+    background: linear-gradient(90deg, #0e4494 0%, #1a6fd4 100%);
+}
+#testcaseTable thead th {
+    color: #fff;
+    font-weight: 700;
+    padding: 14px 10px;
+    text-align: left;
+    font-size: 0.88em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border: none;
+    white-space: nowrap;
+}
+#testcaseTable thead th.th-expand { width: 40px; text-align: center; }
+#testcaseTable tbody tr:not(.details-row) {
+    background: #fff;
+    transition: background 0.18s;
+    cursor: pointer;
+}
+#testcaseTable tbody tr:not(.details-row):nth-child(even) {
+    background: #f7f9fd;
+}
+#testcaseTable tbody tr:not(.details-row):hover {
+    background: #eaf2ff !important;
+}
+#testcaseTable tbody td {
+    padding: 12px 10px;
+    border-bottom: 1px solid #e8eef5;
+    vertical-align: middle;
+}
+.td-module { font-weight: 600; color: #1e293b; font-size: 0.98em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.td-tcid { font-family: 'Courier New', monospace; font-size: 0.94em; color: #2563eb; font-weight: 700; letter-spacing: 0.3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.td-desc { vertical-align: middle; }
+/* table-layout:fixed keeps each column at its assigned width.
+   The description cell wraps text inside its column so the row height is
+   driven only by the content of that run, not by neighbouring cells growing. */
+#testcaseTable tbody tr:not(.details-row) td {
+    box-sizing: border-box;
+    vertical-align: middle;
+}
+/* Only clip module and tcid columns — never the Last 7 column */
+#testcaseTable tbody td.td-module,
+#testcaseTable tbody td.td-tcid {
+    overflow: hidden;
+}
+.desc-chip {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    background: linear-gradient(90deg, #eff6ff, #e0ecff);
+    color: #1e40af;
+    border: 1px solid #bfdbfe;
+    border-radius: 6px;
+    padding: 7px 12px;
+    font-size: 0.91em;
+    font-weight: 600;
+    letter-spacing: 0.1px;
+    white-space: normal;
+    word-break: break-word;
+    overflow: hidden;
+    line-height: 1.5;
+    vertical-align: middle;
+    box-sizing: border-box;
+    width: 100%;
+    max-height: calc(2 * 1.5em + 14px);
+}
+.td-date { font-size: 0.92em; color: #475569; font-weight: 500; white-space: nowrap; }
+.td-dur { font-size: 0.91em; color: #64748b; white-space: nowrap; text-align: center; }
+
+/* ===== Status Badges ===== */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 14px;
+    border-radius: 20px;
+    font-size: 0.88em;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    white-space: nowrap;
+}
+.badge-pass { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+.badge-fail { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+.badge-skip { background: #fef9c3; color: #92400e; border: 1px solid #fde68a; }
+
+/* ===== Expand Chevron ===== */
+.expand-icon { text-align: center; width: 36px; }
+.chevron {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: #f1f5f9;
+    color: #666;
+    font-size: 10px;
+    transition: all 0.2s ease;
+    border: 1px solid #e2e8f0;
+}
+#testcaseTable tbody tr:hover .chevron {
+    background: #dbeafe;
+    color: #1d4ed8;
+    border-color: #93c5fd;
+}
+
+/* ===== Video Button ===== */
+.video-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: linear-gradient(90deg, #0e4494, #2563eb);
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 0.9em;
+    font-weight: 600;
+    text-decoration: none;
+    transition: opacity 0.15s, transform 0.15s;
+    box-shadow: 0 2px 6px rgba(14,68,148,0.25);
+}
+.video-btn:hover { opacity: 0.92; transform: translateY(-1px); }
+.video-btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px; height: 16px;
+    background: rgba(255,255,255,0.22);
+    border-radius: 50%;
+    font-size: 9px;
+    padding-left: 2px;
+    line-height: 1;
+}
+
+/* ===== Step Table ===== */
+.step-table { width:95%; margin:10px auto; border-collapse:collapse; font-size:0.85em; table-layout:fixed; border-radius:8px; overflow:hidden; }
+.step-table th, .step-table td { border:1px solid #e2e8f0; padding:9px 10px; text-align:left; word-wrap:break-word; overflow-wrap:break-word; }
+.step-table th { background: linear-gradient(90deg,#1e293b,#334155); color:#fff; font-size:0.82em; text-transform:uppercase; letter-spacing:0.5px; }
+.step-table tbody tr { transition: background 0.15s; }
+.step-table tbody tr:hover { background: #eaf2ff !important; }
+.step-table td:nth-child(1), .step-table th:nth-child(1) { width:30%; }
+.step-table td:nth-child(2), .step-table th:nth-child(2) { width:25%; }
+.step-table td:nth-child(3), .step-table th:nth-child(3) { width:25%; }
+.step-table td:nth-child(4), .step-table th:nth-child(4) { width:10%; text-align:center; }
+.step-table td:nth-child(5), .step-table th:nth-child(5) { width:10%; text-align:center; }
+.screenshot { max-width:80px; max-height:80px; object-fit:cover; cursor:pointer; border:1px solid #ccc; border-radius:4px; }
+.environment-ribbon { background:#f4f6f8; padding:10px; font-size:0.9em; border-bottom:1px solid #ddd; display:flex; justify-content:space-around; flex-wrap:wrap; gap:8px; }
+.toolbar input, .toolbar select, .toolbar button { padding:6px 10px; border-radius:5px; border:1px solid #ccc; }
+.toolbar button { background:#007bff; color:white; border:none; cursor:pointer; }
+
+/* ===== Lightbox Modal ===== */
+.modal {
+    display: none; position: fixed; z-index: 9999;
+    padding-top: 60px; left: 0; top: 0;
+    width: 100%; height: 100%; overflow: auto;
+    background-color: rgba(0,0,0,0.9);
+}
+.modal-content { display:block; margin:auto; max-width:80%; max-height:80%; }
+video.modal-content { width:80%; background:black; }
+#closeModal {
+    position:absolute; top:20px; right:35px;
+    color:#fff; font-size:30px; font-weight:bold; cursor:pointer;
+}
+.chart-container canvas { max-width:300px !important; max-height:300px !important; }
+.detailed-report-link { text-align:right; padding:10px; display:block; }
+.detailed-report-link a { text-decoration:none; }
+.back-btn {
+    background: linear-gradient(90deg, #0e4494 0%, #1a6fd4 100%);
+    color: #fff;
+    padding: 10px 22px;
+    border-radius: 999px;
+    text-decoration: none;
+    box-shadow: 0 4px 14px rgba(14,68,148,0.30);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 14px 0;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.95em;
+    letter-spacing: 0.2px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+    border: none;
+}
+.back-btn:hover {
+    opacity: 0.95;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(14,68,148,0.36);
+}
+.back-btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.05em;
+    line-height: 1;
+}
+.status-pass { color:#28a745; font-weight:bold; }
+.status-fail { color:#dc3545; font-weight:bold; }
+.status-skipped { color:#ffc107; font-weight:bold; }
+.sla-pass { color:#28a745; font-weight:bold; }
+.sla-fail { color:#dc3545; font-weight:bold; }
+</style>
+</head>
+<body>
+
+<!-- ===== Summary Section ===== -->
+<div id="summary-section">
+    <div class="header">
+        <img alt="Company Logo" src="https://www.resulticks.com/images/logos/resulticks-logo-blue.svg"/>
+        <h2>Automation Test Summary Report</h2>
+        <img alt="Product Logo" src="https://run19.resul.io/assets/resulticks-logo-white-391eec89.svg"/>
+    </div>
+    <div class="summary-band">
+        <div>📊 Total: 35</div>
+        <div>✅ Passed: 0</div>
+        <div>❌ Failed: 35</div>
+        <div>⚠️ Skipped: 0</div>
+        <div>⏱️ Duration: 00:05:56</div>
+        <div>🎯 SLA: 90%</div>
+        <div>🎯 Pass Rate: 0.00%</div>
+    </div>
+    <div class="detailed-report-link">
+        <a class="back-btn" onclick="showDetailedReport()"><span class="back-btn-icon">&#8594;</span> Detailed Report</a>
+    </div>
+    <div class="main">
+        <div class="chart-container">
+            <canvas id="chart1"></canvas>
+        </div>
+        <div class="table-container">
+            <h3>Module-wise Results</h3>
+            <table>
+                <tr><th>Module</th><th>Total</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Duration</th><th>SLA %</th><th>Pass %</th></tr>
+                <tbody id="moduleTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+    <div class="footer">
+        Report generated on <span id="current-datetime">26-07-06 17:46:48</span> |
+        Contact: <a href="mailto:qaautomation@resulticks.com">qaautomation@resulticks.com</a>
+    </div>
+</div>
+
+<!-- ===== Detailed Section ===== -->
+<div id="detailed-section" class="detailed-section" style="padding:20px; box-sizing:border-box; width:100%;">
+    <div class="header"><img alt="Company Logo" src="https://www.resulticks.com/images/logos/resulticks-logo-blue.svg"/><h2>Detail Test Report</h2><img alt="Product Logo" src="https://run.resulticks.com/assets/resulticks-logo-white-391eec89.svg"/></div><div class="environment-ribbon"><span><strong>Environment:</strong> team</span><span><strong>Browser:</strong> chrome</span><span><strong>Release:</strong> 5.0.10</span><span><strong>Execution Date:</strong> 26-07-06 17:46:48</span></div><div style="text-align:right; padding:10px;"><a class="back-btn" onclick="showSummaryReport()"><span class="back-btn-icon">&#8592;</span> Back to Summary</a></div><div class="table-container"><h3>Test Case Results</h3><div class="toolbar"><div style="display:flex; gap:15px; flex-wrap:wrap; margin:20px 0;"><div><label><b>Search:</b></label><input id="searchInput" placeholder="Search test cases..." type="text"/></div><div><label><b>Filter by Status:</b></label><select id="statusFilter"><option value="">All</option><option value="PASS">Passed</option><option value="FAIL">Failed</option><option value="SKIPPED">Skipped</option></select></div></div></div><table id="testcaseTable">
+<colgroup>
+  <col style="width:40px">
+  <col style="width:11%">
+  <col style="width:10%">
+  <col>
+  <col style="width:9%">
+  <col style="width:8%">
+  <col style="width:10%">
+  <col style="width:26%">
+</colgroup>
+<thead><tr>
+  <th class="th-expand"></th>
+  <th>Module</th>
+  <th>Test Case ID</th>
+  <th>Description</th>
+  <th style="text-align:center;">Status</th>
+  <th style="text-align:center;">Duration</th>
+  <th style="text-align:center;">Video</th>
+  <th class="th-last7">Last 7 Execution</th>
+</tr></thead><tbody><tr data-test-id="tc1" data-status="FAIL" data-expanded="false" data-module="ANALYTICS" data-testcaseid="RS-T2636" data-rundate="26-07-06 1" data-duration="17s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">ANALYTICS</td><td class="td-tcid">RS-T2636</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Analytics access all menus in listing page">Analytics access all menus in listing page</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">17s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T2636_20260706121155484988_test_analytics_access_all_menus_in_listing_page_20260706174154.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc1-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2636_20260706121132201256_RS-T2636_20260706174131836609.jpg"/></td></tr><tr><td>the user clicks the Analytics module</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2636_20260706121148150482_RS-T2636_20260706174147808748.jpg"/></td></tr></table></td></tr><tr data-test-id="tc2" data-status="FAIL" data-expanded="false" data-module="AUDIENCE" data-testcaseid="RS-T1510" data-rundate="26-07-06 1" data-duration="17s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">AUDIENCE</td><td class="td-tcid">RS-T1510</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Upload audience using target list single csv file and verify sync history">Upload audience using target list single csv file and verify sync history</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">17s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T1510_20260706121245034577_test_upload_audience_using_target_list_single_csv_file_and_verify_sync_history_20260706174244.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc2-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1510_20260706121222625860_RS-T1510_20260706174222272202.jpg"/></td></tr><tr><td>the user clicks Preferences Module</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1510_20260706121238516191_RS-T1510_20260706174238183262.jpg"/></td></tr></table></td></tr><tr data-test-id="tc3" data-status="FAIL" data-expanded="false" data-module="PREFERENCES" data-testcaseid="RS-T1131" data-rundate="26-07-06 1" data-duration="18s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">PREFERENCES</td><td class="td-tcid">RS-T1131</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Validate access all main menus">Validate access all main menus</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">18s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T1131_20260706121335231135_test_validate_access_all_main_menus_20260706174334.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc3-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1131_20260706121312063244_RS-T1131_20260706174311699827.jpg"/></td></tr><tr><td>User clicks the &quot;Dashboard&quot; page</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1131_20260706121329145613_RS-T1131_20260706174328815515.jpg"/></td></tr></table></td></tr><tr data-test-id="tc4" data-status="FAIL" data-expanded="false" data-module="AUDIENCE" data-testcaseid="RS-T1513" data-rundate="26-07-06 1" data-duration="17s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">AUDIENCE</td><td class="td-tcid">RS-T1513</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Upload audience using adhoc list single csv file and verify sync history">Upload audience using adhoc list single csv file and verify sync history</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">17s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T1513_20260706121154429330_test_upload_audience_using_adhoc_list_single_csv_file_and_verify_sync_history_20260706174153.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc4-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1513_20260706121131406530_RS-T1513_20260706174130962326.jpg"/></td></tr><tr><td>the user clicks Preferences Module</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1513_20260706121147296161_RS-T1513_20260706174146973795.jpg"/></td></tr></table></td></tr><tr data-test-id="tc5" data-status="FAIL" data-expanded="false" data-module="AUDIENCE" data-testcaseid="RS-T1695" data-rundate="26-07-06 1" data-duration="17s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">AUDIENCE</td><td class="td-tcid">RS-T1695</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Verify user is able to create and approve a dynamic list using website trigger">Verify user is able to create and approve a dynamic list using website trigger</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">17s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T1695_20260706121243624739_test_verify_user_is_able_to_create_and_approve_a_dynamic_list_using_website_trigger_20260706174243.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc5-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260706121221236917_RS-T1695_20260706174220879836.jpg"/></td></tr><tr><td>the user navigates to Audience Dynamic List section</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1695_20260706121237165024_RS-T1695_20260706174236814610.jpg"/></td></tr></table></td></tr><tr data-test-id="tc6" data-status="FAIL" data-expanded="false" data-module="PREFERENCES" data-testcaseid="RS-T6431" data-rundate="26-07-06 1" data-duration="17s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">PREFERENCES</td><td class="td-tcid">RS-T6431</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Validate email consumption grid and csv count">Validate email consumption grid and csv count</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">17s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T6431_20260706121330539022_test_validate_email_consumption_grid_and_csv_count_20260706174329.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc6-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T6431_20260706121309393989_RS-T6431_20260706174309033791.jpg"/></td></tr><tr><td>the user clicks Preferences Module</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T6431_20260706121325287017_RS-T6431_20260706174324958097.jpg"/></td></tr></table></td></tr><tr data-test-id="tc7" data-status="FAIL" data-expanded="false" data-module="COMMUNICATION" data-testcaseid="RS-T1723" data-rundate="26-07-06 1" data-duration="50s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">COMMUNICATION</td><td class="td-tcid">RS-T1723</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Communication qr smartlink kyc">Communication qr smartlink kyc</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">50s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T1723_20260706121257672269_test_communication_qr_smartlink_kyc_20260706174256.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc7-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1723_20260706121203189592_RS-T1723_20260706174202844828.jpg"/></td></tr><tr><td>Select business unit &#39;&#39;</td><td>Business unit should be selected successfully</td><td>Business unit &#39;&#39; not selected.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1723_20260706121219109433_RS-T1723_20260706174218782895.jpg"/></td></tr><tr><td>Click the Communication module</td><td>User should navigate to Communication module</td><td>Failed to navigate to Communication module</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1723_20260706121235075714_RS-T1723_20260706174234721838.jpg"/></td></tr><tr><td>the user selects the Create communication</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1723_20260706121252015151_RS-T1723_20260706174251682282.jpg"/></td></tr></table></td></tr><tr data-test-id="tc8" data-status="FAIL" data-expanded="false" data-module="COMMUNICATION" data-testcaseid="RS-T1838" data-rundate="26-07-06 1" data-duration="50s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">COMMUNICATION</td><td class="td-tcid">RS-T1838</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Create sdc sms communication with target list">Create sdc sms communication with target list</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">50s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T1838_20260706121449268430_test_create_sdc_sms_communication_with_target_list_20260706174448.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc8-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1838_20260706121355486791_RS-T1838_20260706174355141612.jpg"/></td></tr><tr><td>Select business unit &#39;&#39;</td><td>Business unit should be selected successfully</td><td>Business unit &#39;&#39; not selected.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1838_20260706121411458351_RS-T1838_20260706174411109415.jpg"/></td></tr><tr><td>Click the Communication module</td><td>User should navigate to Communication module</td><td>Failed to navigate to Communication module</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1838_20260706121427366197_RS-T1838_20260706174427032789.jpg"/></td></tr><tr><td>the user selects the Create communication</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1838_20260706121444287787_RS-T1838_20260706174443955578.jpg"/></td></tr></table></td></tr><tr data-test-id="tc9" data-status="FAIL" data-expanded="false" data-module="COMMUNICATION" data-testcaseid="RS-T1853" data-rundate="26-07-06 1" data-duration="50s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">COMMUNICATION</td><td class="td-tcid">RS-T1853</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Sdc sms communication test preview with target list">Sdc sms communication test preview with target list</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">50s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T1853_20260706121256575339_test_sdc_sms_communication_test_preview_with_target_list_20260706174255.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc9-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1853_20260706121202225364_RS-T1853_20260706174201894272.jpg"/></td></tr><tr><td>Select business unit &#39;&#39;</td><td>Business unit should be selected successfully</td><td>Business unit &#39;&#39; not selected.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1853_20260706121218190819_RS-T1853_20260706174217852676.jpg"/></td></tr><tr><td>Click the Communication module</td><td>User should navigate to Communication module</td><td>Failed to navigate to Communication module</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1853_20260706121234109983_RS-T1853_20260706174233773567.jpg"/></td></tr><tr><td>the user selects the Create communication</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1853_20260706121251030720_RS-T1853_20260706174250700313.jpg"/></td></tr></table></td></tr><tr data-test-id="tc10" data-status="FAIL" data-expanded="false" data-module="COMMUNICATION" data-testcaseid="RS-T2616" data-rundate="26-07-06 1" data-duration="33s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">COMMUNICATION</td><td class="td-tcid">RS-T2616</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Create et sms communication with form submission">Create et sms communication with form submission</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">33s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T2616_20260706121415090726_test_create_et_sms_communication_with_form_submission_20260706174414.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc10-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2616_20260706121338384595_RS-T2616_20260706174338042349.jpg"/></td></tr><tr><td>Select business unit &#39;&#39;</td><td>Business unit should be selected successfully</td><td>Business unit &#39;&#39; not selected.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2616_20260706121354312713_RS-T2616_20260706174353982967.jpg"/></td></tr><tr><td>the user clicks Preferences Module</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2616_20260706121410214333_RS-T2616_20260706174409882860.jpg"/></td></tr></table></td></tr><tr data-test-id="tc11" data-status="FAIL" data-expanded="false" data-module="AUDIENCE" data-testcaseid="RS-T1682" data-rundate="26-07-06 1" data-duration="17s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">AUDIENCE</td><td class="td-tcid">RS-T1682</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Verify user is able to create and approve a dynamic list using mobile app trigger">Verify user is able to create and approve a dynamic list using mobile app trigger</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">17s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T1682_20260706121151276111_test_verify_user_is_able_to_create_and_approve_a_dynamic_list_using_mobile_app_trigger_20260706174150.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc11-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1682_20260706121129152894_RS-T1682_20260706174128779011.jpg"/></td></tr><tr><td>the user navigates to Audience Dynamic List section</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1682_20260706121145030794_RS-T1682_20260706174144705241.jpg"/></td></tr></table></td></tr><tr data-test-id="tc12" data-status="FAIL" data-expanded="false" data-module="AUDIENCE" data-testcaseid="RS-T149" data-rundate="26-07-06 1" data-duration="17s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">AUDIENCE</td><td class="td-tcid">RS-T149</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Verify user is able to create a dynamic list using audience base trigger">Verify user is able to create a dynamic list using audience base trigger</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">17s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T149_20260706121237843681_test_verify_user_is_able_to_create_a_dynamic_list_using_audience_base_trigger_20260706174237.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc12-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T149_20260706121216055880_RS-T149_20260706174215714842.jpg"/></td></tr><tr><td>the user navigates to Audience Dynamic List section</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T149_20260706121231982573_RS-T149_20260706174231633433.jpg"/></td></tr></table></td></tr><tr data-test-id="tc13" data-status="FAIL" data-expanded="false" data-module="COMMUNICATION" data-testcaseid="RS-T1625" data-rundate="26-07-06 1" data-duration="34s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">COMMUNICATION</td><td class="td-tcid">RS-T1625</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Create sdc web alert push communication with browser image">Create sdc web alert push communication with browser image</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">34s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T1625_20260706121359963365_test_create_sdc_web_alert_push_communication_with_browser_image_20260706174359.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc13-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1625_20260706121321381776_RS-T1625_20260706174321033563.jpg"/></td></tr><tr><td>Click the Communication module</td><td>User should navigate to Communication module</td><td>Failed to navigate to Communication module</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1625_20260706121337450646_RS-T1625_20260706174337122638.jpg"/></td></tr><tr><td>the user selects the Create communication</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1625_20260706121354362758_RS-T1625_20260706174354030333.jpg"/></td></tr></table></td></tr><tr data-test-id="tc14" data-status="FAIL" data-expanded="false" data-module="PREFERENCES" data-testcaseid="RS-T2622" data-rundate="26-07-06 1" data-duration="17s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">PREFERENCES</td><td class="td-tcid">RS-T2622</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Preferences email footer creation">Preferences email footer creation</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">17s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T2622_20260706121445079502_test_preferences_email_footer_creation_20260706174444.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc14-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2622_20260706121424403222_RS-T2622_20260706174424057265.jpg"/></td></tr><tr><td>the user clicks Preferences Module</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2622_20260706121440301236_RS-T2622_20260706174439970776.jpg"/></td></tr></table></td></tr><tr data-test-id="tc15" data-status="FAIL" data-expanded="false" data-module="AUDIENCE" data-testcaseid="RS-T151" data-rundate="26-07-06 1" data-duration="17s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">AUDIENCE</td><td class="td-tcid">RS-T151</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Verify user is able to create a dynamic list using target list trigger">Verify user is able to create a dynamic list using target list trigger</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">17s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T151_20260706121152251048_test_verify_user_is_able_to_create_a_dynamic_list_using_target_list_trigger_20260706174151.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc15-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T151_20260706121129189051_RS-T151_20260706174128839686.jpg"/></td></tr><tr><td>the user navigates to Audience Dynamic List section</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T151_20260706121145721248_RS-T151_20260706174145396159.jpg"/></td></tr></table></td></tr><tr data-test-id="tc16" data-status="FAIL" data-expanded="false" data-module="AUDIENCE" data-testcaseid="RS-T147" data-rundate="26-07-06 1" data-duration="17s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">AUDIENCE</td><td class="td-tcid">RS-T147</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Verify user is able to create a dynamic list using subscription form trigger">Verify user is able to create a dynamic list using subscription form trigger</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">17s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T147_20260706121240091942_test_verify_user_is_able_to_create_a_dynamic_list_using_subscription_form_trigger_20260706174239.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc16-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T147_20260706121217823230_RS-T147_20260706174217470878.jpg"/></td></tr><tr><td>the user navigates to Audience Dynamic List section</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T147_20260706121233726908_RS-T147_20260706174233397378.jpg"/></td></tr></table></td></tr><tr data-test-id="tc17" data-status="FAIL" data-expanded="false" data-module="COMMUNICATION" data-testcaseid="RS-T522" data-rundate="26-07-06 1" data-duration="34s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">COMMUNICATION</td><td class="td-tcid">RS-T522</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Create sdc whatsapp communication with target list">Create sdc whatsapp communication with target list</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">34s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T522_20260706121402176623_test_create_sdc_whatsapp_communication_with_target_list_20260706174401.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc17-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T522_20260706121323551658_RS-T522_20260706174323202230.jpg"/></td></tr><tr><td>Click the Communication module</td><td>User should navigate to Communication module</td><td>Failed to navigate to Communication module</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T522_20260706121339479246_RS-T522_20260706174339145579.jpg"/></td></tr><tr><td>the user selects the Create communication</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T522_20260706121356406751_RS-T522_20260706174356078662.jpg"/></td></tr></table></td></tr><tr data-test-id="tc18" data-status="FAIL" data-expanded="false" data-module="AUDIENCE" data-testcaseid="RS-T1541" data-rundate="26-07-06 1" data-duration="18s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">AUDIENCE</td><td class="td-tcid">RS-T1541</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Verify mdm overview portlet counts with info popup">Verify mdm overview portlet counts with info popup</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">18s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T1541_20260706121157556869_test_verify_mdm_overview_portlet_counts_with_info_popup_20260706174157.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc18-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1541_20260706121132801129_RS-T1541_20260706174132424516.jpg"/></td></tr><tr><td>User navigates to the Master Data Management</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1541_20260706121149762604_RS-T1541_20260706174149428424.jpg"/></td></tr></table></td></tr><tr data-test-id="tc19" data-status="FAIL" data-expanded="false" data-module="AUDIENCE" data-testcaseid="RS-T1612" data-rundate="26-07-06 1" data-duration="18s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">AUDIENCE</td><td class="td-tcid">RS-T1612</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Verify mdm overview chart portlet percentage">Verify mdm overview chart portlet percentage</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">18s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T1612_20260706121249763905_test_verify_mdm_overview_chart_portlet_percentage_20260706174249.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc19-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1612_20260706121226593943_RS-T1612_20260706174226256968.jpg"/></td></tr><tr><td>User navigates to the Master Data Management</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1612_20260706121243519638_RS-T1612_20260706174243183715.jpg"/></td></tr></table></td></tr><tr data-test-id="tc20" data-status="FAIL" data-expanded="false" data-module="PREFERENCES" data-testcaseid="RS-T2306" data-rundate="26-07-06 1" data-duration="153s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">PREFERENCES</td><td class="td-tcid">RS-T2306</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Validate form creation publish download flow">Validate form creation publish download flow</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">153s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T2306_20260706121634015385_test_validate_form_creation_publish_download_flow_20260706174632.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc20-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2306_20260706121330973251_RS-T2306_20260706174330623632.jpg"/></td></tr><tr><td>Select business unit &#39;Automation Testing&#39;</td><td>Business unit should be selected successfully</td><td>Business unit &#39;Automation Testing&#39; not selected.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2306_20260706121346903874_RS-T2306_20260706174346576246.jpg"/></td></tr><tr><td>the user clicks Preferences Module</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2306_20260706121603634709_RS-T2306_20260706174402468348.jpg"/></td></tr></table></td></tr><tr data-test-id="tc21" data-status="FAIL" data-expanded="false" data-module="AUDIENCE" data-testcaseid="RS-T157" data-rundate="26-07-06 1" data-duration="17s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">AUDIENCE</td><td class="td-tcid">RS-T157</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Create and validate target list segmentation">Create and validate target list segmentation</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">17s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T157_20260706121155406757_test_create_and_validate_target_list_segmentation_20260706174154.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc21-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T157_20260706121132220026_RS-T157_20260706174131850780.jpg"/></td></tr><tr><td>User navigates to the Target listing page</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T157_20260706121148099469_RS-T157_20260706174147768226.jpg"/></td></tr></table></td></tr><tr data-test-id="tc22" data-status="FAIL" data-expanded="false" data-module="AUDIENCE" data-testcaseid="RS-T1697" data-rundate="26-07-06 1" data-duration="17s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">AUDIENCE</td><td class="td-tcid">RS-T1697</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Validate newly created attribute appears disabled and then enabled in target list creation">Validate newly created attribute appears disabled and then enabled in target list creation</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">17s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T1697_20260706121244963235_test_validate_newly_created_attribute_appears_disabled_and_then_enabled_in_target_list_creation_20260706174244.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc22-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1697_20260706121222686879_RS-T1697_20260706174222326334.jpg"/></td></tr><tr><td>the user clicks Preferences Module</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1697_20260706121238555205_RS-T1697_20260706174238219385.jpg"/></td></tr></table></td></tr><tr data-test-id="tc23" data-status="FAIL" data-expanded="false" data-module="PREFERENCES" data-testcaseid="RS-T2087" data-rundate="26-07-06 1" data-duration="17s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">PREFERENCES</td><td class="td-tcid">RS-T2087</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Validate sms consumption grid and csv count">Validate sms consumption grid and csv count</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">17s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T2087_20260706121332021508_test_validate_sms_consumption_grid_and_csv_count_20260706174331.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc23-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2087_20260706121310780131_RS-T2087_20260706174310437821.jpg"/></td></tr><tr><td>the user clicks Preferences Module</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2087_20260706121326686513_RS-T2087_20260706174326356091.jpg"/></td></tr></table></td></tr><tr data-test-id="tc24" data-status="FAIL" data-expanded="false" data-module="COMMUNICATION" data-testcaseid="RS-T2775" data-rundate="26-07-06 1" data-duration="9s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">COMMUNICATION</td><td class="td-tcid">RS-T2775</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Validate access producturl validation">Validate access producturl validation</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">9s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T2775_20260706121126905430_test_validate_access_producturl_validation_20260706174125.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc24-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2775_20260706121116771497_RS-T2775_20260706174116428460.jpg"/></td></tr><tr><td>Launch Resulticks URL</td><td>Resulticks URL should be launched successfully</td><td>Resulticks URL launched successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2775_20260706121118624819_RS-T2775_20260706174117926478.jpg"/></td></tr><tr><td>Verify Resulticks page is loaded</td><td>Resulticks page should be displayed successfully</td><td>Resulticks page displayed successfully</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2775_20260706121119838123_RS-T2775_20260706174119220429.jpg"/></td></tr><tr><td>Click Request Meeting on Resulticks page</td><td>User should navigate to Request Meeting form page</td><td>Navigated to Request Meeting form page</td><td>✅</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2775_20260706121121461242_RS-T2775_20260706174120608566.jpg"/></td></tr><tr><td>the user is navigated to the &quot;RESULTICKS REQUEST MEETING FORM PAGE&quot;</td><td></td><td>Locator.is_visible: Target page, context or browser has been closed</td><td>❌</td><td>-</td></tr></table></td></tr><tr data-test-id="tc25" data-status="FAIL" data-expanded="false" data-module="COMMUNICATION" data-testcaseid="RS-T1763" data-rundate="26-07-06 1" data-duration="50s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">COMMUNICATION</td><td class="td-tcid">RS-T1763</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Communication emailcommunicationcreatevalidatetargetlist">Communication emailcommunicationcreatevalidatetargetlist</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">50s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T1763_20260706121322692466_test_communication_emailcommunicationcreatevalidatetargetlist_20260706174321.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc25-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260706121227160252_RS-T1763_20260706174226804335.jpg"/></td></tr><tr><td>Select business unit &#39;Automation Testing&#39;</td><td>Business unit should be selected successfully</td><td>Business unit &#39;Automation Testing&#39; not selected.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260706121243109696_RS-T1763_20260706174242767247.jpg"/></td></tr><tr><td>Click the Communication module</td><td>User should navigate to Communication module</td><td>Failed to navigate to Communication module</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260706121259625981_RS-T1763_20260706174259292596.jpg"/></td></tr><tr><td>the user selects the Create communication</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1763_20260706121316636374_RS-T1763_20260706174316305769.jpg"/></td></tr></table></td></tr><tr data-test-id="tc26" data-status="FAIL" data-expanded="false" data-module="COMMUNICATION" data-testcaseid="RS-T1258" data-rundate="26-07-06 1" data-duration="34s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">COMMUNICATION</td><td class="td-tcid">RS-T1258</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Create sdc web alert push communication without image">Create sdc web alert push communication without image</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">34s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T1258_20260706121644041313_test_create_sdc_web_alert_push_communication_without_image_20260706174643.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc26-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1258_20260706121606519152_RS-T1258_20260706174606182820.jpg"/></td></tr><tr><td>Click the Communication module</td><td>User should navigate to Communication module</td><td>Failed to navigate to Communication module</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1258_20260706121622443019_RS-T1258_20260706174622120512.jpg"/></td></tr><tr><td>the user selects the Create communication</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1258_20260706121639369744_RS-T1258_20260706174639042847.jpg"/></td></tr></table></td></tr><tr data-test-id="tc27" data-status="FAIL" data-expanded="false" data-module="COMMUNICATION" data-testcaseid="RS-T1766" data-rundate="26-07-06 1" data-duration="17s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">COMMUNICATION</td><td class="td-tcid">RS-T1766</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Communication emailcommunicationcreatevalidateadhoclist">Communication emailcommunicationcreatevalidateadhoclist</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">17s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T1766_20260706121154563846_test_communication_emailcommunicationcreatevalidateadhoclist_20260706174154.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc27-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260706121131564380_RS-T1766_20260706174131222714.jpg"/></td></tr><tr><td>the user clicks Preferences Module</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1766_20260706121147468428_RS-T1766_20260706174147134958.jpg"/></td></tr></table></td></tr><tr data-test-id="tc28" data-status="FAIL" data-expanded="false" data-module="COMMUNICATION" data-testcaseid="RS-T1774" data-rundate="26-07-06 1" data-duration="34s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">COMMUNICATION</td><td class="td-tcid">RS-T1774</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Communication emailcommunicationadhocpreview">Communication emailcommunicationadhocpreview</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">34s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T1774_20260706121315529812_test_communication_emailcommunicationadhocpreview_20260706174314.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc28-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1774_20260706121236648004_RS-T1774_20260706174236302369.jpg"/></td></tr><tr><td>Click the Communication module</td><td>User should navigate to Communication module</td><td>Failed to navigate to Communication module</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1774_20260706121252593315_RS-T1774_20260706174252259884.jpg"/></td></tr><tr><td>the user selects the Create communication</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1774_20260706121309624359_RS-T1774_20260706174309295873.jpg"/></td></tr></table></td></tr><tr data-test-id="tc29" data-status="FAIL" data-expanded="false" data-module="PREFERENCES" data-testcaseid="RS-T1244" data-rundate="26-07-06 1" data-duration="17s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">PREFERENCES</td><td class="td-tcid">RS-T1244</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Access all main menus in preferences">Access all main menus in preferences</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">17s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T1244_20260706121401904239_test_access_all_main_menus_in_preferences_20260706174401.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc29-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1244_20260706121340631508_RS-T1244_20260706174340239545.jpg"/></td></tr><tr><td>the user clicks Preferences Module</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1244_20260706121356531138_RS-T1244_20260706174356195854.jpg"/></td></tr></table></td></tr><tr data-test-id="tc30" data-status="FAIL" data-expanded="false" data-module="COMMUNICATION" data-testcaseid="RS-T2586" data-rundate="26-07-06 1" data-duration="17s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">COMMUNICATION</td><td class="td-tcid">RS-T2586</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Communication createet formsubmission">Communication createet formsubmission</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">17s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T2586_20260706121155545945_test_communication_createet_formsubmission_20260706174155.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc30-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2586_20260706121132437254_RS-T2586_20260706174132096841.jpg"/></td></tr><tr><td>the user clicks Preferences Module</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2586_20260706121148324253_RS-T2586_20260706174147984529.jpg"/></td></tr></table></td></tr><tr data-test-id="tc31" data-status="FAIL" data-expanded="false" data-module="COMMUNICATION" data-testcaseid="RS-T1279" data-rundate="26-07-06 1" data-duration="34s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">COMMUNICATION</td><td class="td-tcid">RS-T1279</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Communication emailtextcommunicationblast">Communication emailtextcommunicationblast</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">34s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T1279_20260706121317074069_test_communication_emailtextcommunicationblast_20260706174316.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc31-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1279_20260706121238081389_RS-T1279_20260706174237735257.jpg"/></td></tr><tr><td>Click the Communication module</td><td>User should navigate to Communication module</td><td>Failed to navigate to Communication module</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1279_20260706121254047620_RS-T1279_20260706174253715449.jpg"/></td></tr><tr><td>the user selects the Create communication</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1279_20260706121310969288_RS-T1279_20260706174310642226.jpg"/></td></tr></table></td></tr><tr data-test-id="tc32" data-status="FAIL" data-expanded="false" data-module="PREFERENCES" data-testcaseid="RS-T2308" data-rundate="26-07-06 1" data-duration="63s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">PREFERENCES</td><td class="td-tcid">RS-T2308</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Email template creation edit">Email template creation edit</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">63s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T2308_20260706121557125661_test_email_template_creation_edit_20260706174556.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc32-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2308_20260706121440071600_RS-T2308_20260706174439723648.jpg"/></td></tr><tr><td>User navigates to the &quot;Communication dashboard&quot; as expected</td><td></td><td>&#39;NoneType&#39; object has no attribute &#39;lower&#39;</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2308_20260706121542043892_RS-T2308_20260706174541711372.jpg"/></td></tr></table></td></tr><tr data-test-id="tc33" data-status="FAIL" data-expanded="false" data-module="COMMUNICATION" data-testcaseid="RS-T2118" data-rundate="26-07-06 1" data-duration="34s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">COMMUNICATION</td><td class="td-tcid">RS-T2118</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Create sdc mobile alert push communication with browser image">Create sdc mobile alert push communication with browser image</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">34s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T2118_20260706121224692353_test_create_sdc_mobile_alert_push_communication_with_browser_image_20260706174223.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc33-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260706121144483085_RS-T2118_20260706174144124726.jpg"/></td></tr><tr><td>Click the Communication module</td><td>User should navigate to Communication module</td><td>Failed to navigate to Communication module</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260706121200410113_RS-T2118_20260706174200085113.jpg"/></td></tr><tr><td>the user selects the Create communication</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2118_20260706121217332216_RS-T2118_20260706174216994781.jpg"/></td></tr></table></td></tr><tr data-test-id="tc34" data-status="FAIL" data-expanded="false" data-module="COMMUNICATION" data-testcaseid="RS-T2113" data-rundate="26-07-06 1" data-duration="34s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">COMMUNICATION</td><td class="td-tcid">RS-T2113</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Create sdc mobile alert push communication without image">Create sdc mobile alert push communication without image</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">34s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T2113_20260706121345908608_test_create_sdc_mobile_alert_push_communication_without_image_20260706174345.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc34-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2113_20260706121307479189_RS-T2113_20260706174307103650.jpg"/></td></tr><tr><td>Click the Communication module</td><td>User should navigate to Communication module</td><td>Failed to navigate to Communication module</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2113_20260706121323467785_RS-T2113_20260706174323093838.jpg"/></td></tr><tr><td>the user selects the Create communication</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2113_20260706121340437585_RS-T2113_20260706174340042593.jpg"/></td></tr></table></td></tr><tr data-test-id="tc35" data-status="FAIL" data-expanded="false" data-module="PREFERENCES" data-testcaseid="RS-T2312" data-rundate="26-07-06 1" data-duration="17s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">PREFERENCES</td><td class="td-tcid">RS-T2312</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Validate webhook creation mdc campaign">Validate webhook creation mdc campaign</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">17s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T2312_20260706121431369207_test_validate_webhook_creation_mdc_campaign_20260706174430.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="Tue, 30 Jun 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Wed, 01 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Thu, 02 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Fri, 03 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sat, 04 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-skip" data-tooltip="Sun, 05 Jul 2026 - Skipped">&minus;</span><span class="mini-circle mini-fail" data-tooltip="Mon, 06 Jul 2026 - Fail">&#10007;</span></div></td></tr><tr class="details-row" id="tc35-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>Log in to the application with valid credentials.</td><td>User successfully logs into the platform.</td><td>User unable to log in.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2312_20260706121410568224_RS-T2312_20260706174410221188.jpg"/></td></tr><tr><td>the user clicks Preferences Module</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T2312_20260706121426458962_RS-T2312_20260706174426110389.jpg"/></td></tr></table></td></tr></tbody></table></div>
+<script>
+function toggleDetails(row) {
+    // row could be the <tr> itself (passed from onclick on the expand td)
+    if (!row || !row.getAttribute) return;
+    var detailsRow = document.getElementById(row.getAttribute('data-test-id') + '-details');
+    if (!detailsRow) return;
+    var expandIcon = row.querySelector('.expand-icon .chevron');
+    if (detailsRow.style.display === 'none') {
+        detailsRow.style.display = 'table-row';
+        row.setAttribute('data-expanded', 'true');
+        if (expandIcon) { expandIcon.innerHTML = '&#9660;'; expandIcon.style.color = '#0e4494'; }
+    } else {
+        detailsRow.style.display = 'none';
+        row.setAttribute('data-expanded', 'false');
+        if (expandIcon) { expandIcon.innerHTML = '&#9654;'; expandIcon.style.color = '#666'; }
+    }
+}
+
+function playVideoHandler(event, element) {
+    event.stopPropagation();
+    event.preventDefault();
+    var modal = document.getElementById('lightboxModal');
+    var modalImg = document.getElementById('lightboxImage');
+    var modalVideo = document.getElementById('lightboxVideo');
+    if (modal && modalImg && modalVideo) {
+        modalImg.style.display = 'none';
+        modalImg.src = '';
+        modalVideo.src = element.getAttribute('data-video');
+        modalVideo.style.display = 'block';
+        modal.style.display = 'block';
+        modalVideo.play();
+    }
+}
+
+function applySearchAndFilter() {
+    var searchText = document.getElementById('searchInput').value.toLowerCase().trim();
+    var filterValue = document.getElementById('statusFilter').value;
+    var mainRows = document.querySelectorAll('#testcaseTable > tbody > tr:not(.details-row)');
+    mainRows.forEach(function(row) {
+        var rowText = row.textContent.toLowerCase();
+        var rowStatus = row.getAttribute('data-status') || '';
+        var matchesSearch = !searchText || rowText.includes(searchText);
+        var matchesFilter = !filterValue || rowStatus === filterValue;
+        var shouldShow = matchesSearch && matchesFilter;
+        var testId = row.getAttribute('data-test-id');
+        var detailsRow = document.getElementById(testId + '-details');
+        if (shouldShow) {
+            row.style.display = '';
+            if (detailsRow) {
+                var expanded = row.getAttribute('data-expanded') === 'true';
+                detailsRow.style.display = expanded ? 'table-row' : 'none';
+            }
+        } else {
+            row.style.display = 'none';
+            if (detailsRow) detailsRow.style.display = 'none';
+            var ch = row.querySelector('.expand-icon .chevron');
+            if (ch) { ch.innerHTML = '&#9654;'; ch.style.color = '#666'; }
+            row.setAttribute('data-expanded', 'false');
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    var searchInput = document.getElementById('searchInput');
+    var statusFilter = document.getElementById('statusFilter');
+    if (searchInput) searchInput.addEventListener('input', applySearchAndFilter);
+    if (statusFilter) statusFilter.addEventListener('change', applySearchAndFilter);
+});
+</script>
+        
+</div>
+
+<!-- ===== Lightbox Modal ===== -->
+<div class="modal" id="lightboxModal">
+    <span id="closeModal">&#x2716;</span>
+    <img class="modal-content" id="lightboxImage" style="display:none;"/>
+    <video class="modal-content" id="lightboxVideo" controls style="display:none;"></video>
+</div>
+
+<!-- Floating tooltip for the Last 7 circles (body-level so it isn't clipped by table overflow) -->
+<div id="miniTooltip"></div>
+
+<script>
+/* ===== Navigation ===== */
+function showDetailedReport(moduleFilter) {
+    document.getElementById("summary-section").style.display = "none";
+    document.getElementById("detailed-section").style.display = "block";
+    window.scrollTo(0, 0);
+
+    // Apply module filter if provided, otherwise show all rows
+    var mainRows = document.querySelectorAll('#testcaseTable > tbody > tr:not(.details-row)');
+    mainRows.forEach(function(row) {
+        var rowModule = (row.getAttribute('data-module') || '').toUpperCase().trim();
+        var filterModule = moduleFilter ? moduleFilter.toUpperCase().trim() : '';
+        var shouldShow = !filterModule || rowModule === filterModule;
+        var testId = row.getAttribute('data-test-id');
+        var detailsRow = document.getElementById(testId + '-details');
+        if (shouldShow) {
+            row.style.display = '';
+            if (detailsRow) {
+                var expanded = row.getAttribute('data-expanded') === 'true';
+                detailsRow.style.display = expanded ? 'table-row' : 'none';
+            }
+        } else {
+            row.style.display = 'none';
+            if (detailsRow) detailsRow.style.display = 'none';
+        }
+    });
+
+    // Reset the search/filter controls to reflect no active text/status filter
+    var searchInput = document.getElementById('searchInput');
+    var statusFilter = document.getElementById('statusFilter');
+    if (searchInput) searchInput.value = '';
+    if (statusFilter) statusFilter.value = '';
+}
+function showSummaryReport() {
+    document.getElementById("detailed-section").style.display = "none";
+    document.getElementById("summary-section").style.display = "block";
+    window.scrollTo(0, 0);
+}
+
+/* ===== Doughnut Chart ===== */
+document.addEventListener('DOMContentLoaded', function() {
+    var ctx = document.getElementById('chart1');
+    if (ctx) {
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Passed', 'Failed', 'Skipped'],
+                datasets: [{
+                    data: [0, 35, 0],
+                    backgroundColor: ['#28a745', '#dc3545', '#ffc107']
+                }]
+            },
+            options: { plugins: { legend: { position: 'bottom' } } }
+        });
+    }
+    showSummaryReport();
+    populateModuleTable();
+});
+
+/* ===== Module Table ===== */
+var moduleDataRaw = "[{\"module\": \"ANALYTICS\", \"total\": 1, \"passed\": 0, \"failed\": 1, \"skipped\": 0, \"durationMillis\": 17278}, {\"module\": \"AUDIENCE\", \"total\": 11, \"passed\": 0, \"failed\": 11, \"skipped\": 0, \"durationMillis\": 193234}, {\"module\": \"COMMUNICATION\", \"total\": 15, \"passed\": 0, \"failed\": 15, \"skipped\": 0, \"durationMillis\": 516818}, {\"module\": \"PREFERENCES\", \"total\": 8, \"passed\": 0, \"failed\": 8, \"skipped\": 0, \"durationMillis\": 321701}]";
+var moduleData = [];
+try { moduleData = JSON.parse(moduleDataRaw); } catch (e) { console.error('Failed to parse module data:', e); }
+
+function formatDuration(ms) {
+    if (!ms || ms <= 0) return '-';
+    var totalSeconds = Math.floor(ms / 1000);
+    var hours = Math.floor(totalSeconds / 3600);
+    var minutes = Math.floor((totalSeconds % 3600) / 60);
+    var seconds = totalSeconds % 60;
+    var pad = function(n) { return n.toString().padStart(2, '0'); };
+    return pad(hours) + ':' + pad(minutes) + ':' + pad(seconds);
+}
+
+function populateModuleTable() {
+    var tableBody = document.getElementById('moduleTableBody');
+    if (!tableBody) return;
+
+    if (!moduleData || moduleData.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#666;">No module data available</td></tr>';
+        return;
+    }
+
+    tableBody.innerHTML = moduleData.map(function(m) {
+        var successRate = m.total > 0 ? ((m.passed / m.total) * 100).toFixed(0) : '0';
+        var slaRate = 90;
+        var modName = (m.module || 'Unknown Module');
+        return '<tr class="module-summary-row" data-filter-module="' + modName + '" style="cursor:pointer;">'
+            + '<td>' + modName + '</td>'
+            + '<td>' + (m.total || 0) + '</td>'
+            + '<td>' + (m.passed || 0) + '</td>'
+            + '<td>' + (m.failed || 0) + '</td>'
+            + '<td>' + (m.skipped || 0) + '</td>'
+            + '<td>' + formatDuration(m.durationMillis || 0) + '</td>'
+            + '<td class="' + (slaRate >= 90 ? 'sla-pass' : 'sla-fail') + '">' + slaRate + '%</td>'
+            + '<td class="' + (successRate >= slaRate ? 'sla-pass' : 'sla-fail') + '">' + successRate + '%</td>'
+            + '</tr>';
+    }).join('');
+
+    // Attach click handlers after rows are in the DOM (avoids all inline-JS quoting issues)
+    document.querySelectorAll('.module-summary-row').forEach(function(row) {
+        row.addEventListener('click', function() {
+            showDetailedReport(this.getAttribute('data-filter-module'));
+        });
+    });
+}
+
+/* ===== Floating tooltip for Last 7 circles =====
+   Lives at body level so it is never clipped by .table-container's overflow.
+   Uses document-level event delegation so it works for dynamically rendered rows. */
+(function() {
+    var tip = document.getElementById('miniTooltip');
+    if (!tip) return;
+
+    function positionTip(target) {
+        var rect = target.getBoundingClientRect();
+        var tipRect = tip.getBoundingClientRect();
+        var left = rect.left + (rect.width / 2) - (tipRect.width / 2);
+        var top = rect.top - tipRect.height - 10;
+        var margin = 6;
+        if (left < margin) left = margin;
+        if (left + tipRect.width > window.innerWidth - margin) {
+            left = window.innerWidth - tipRect.width - margin;
+        }
+        if (top < margin) {
+            // not enough room above — show below
+            top = rect.bottom + 10;
+        }
+        tip.style.left = left + 'px';
+        tip.style.top = top + 'px';
+    }
+
+    document.addEventListener('mouseover', function(e) {
+        var el = e.target;
+        if (!el || !el.classList) return;
+        var isCircle = el.classList.contains('mini-circle');
+        var isDesc = el.classList.contains('desc-chip-tip');
+        if (!isCircle && !isDesc) return;
+        var text = el.getAttribute('data-tooltip');
+        if (!text) return;
+        tip.textContent = text;
+        tip.style.left = '-9999px';
+        tip.style.top = '-9999px';
+        tip.classList.add('show');
+        requestAnimationFrame(function() { positionTip(el); });
+    });
+
+    document.addEventListener('mouseout', function(e) {
+        var el = e.target;
+        if (!el || !el.classList) return;
+        if (!el.classList.contains('mini-circle') && !el.classList.contains('desc-chip-tip')) return;
+        tip.classList.remove('show');
+    });
+
+    window.addEventListener('scroll', function() {
+        tip.classList.remove('show');
+    }, true);
+})();
+
+/* ===== Lightbox (screenshot + video) ===== */
+document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('screenshot')) {
+        var modal = document.getElementById('lightboxModal');
+        var modalImg = document.getElementById('lightboxImage');
+        var modalVideo = document.getElementById('lightboxVideo');
+        if (modal && modalImg && modalVideo) {
+            modalVideo.style.display = 'none';
+            modalVideo.pause();
+            modalVideo.src = '';
+            modalImg.src = e.target.src;
+            modalImg.style.display = 'block';
+            modal.style.display = 'block';
+        }
+    }
+    if (e.target.id === 'closeModal' || e.target.classList.contains('modal')) {
+        var modal = document.getElementById('lightboxModal');
+        var modalVideo = document.getElementById('lightboxVideo');
+        if (modalVideo) { modalVideo.pause(); modalVideo.src = ''; }
+        if (modal) { modal.style.display = 'none'; }
+    }
+});
+</script>
+</body>
+</html>
