@@ -1,0 +1,2080 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Automation Test Summary Report</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+/* ===== Last 7 inline hand-drawn tick/cross icons ===== */
+.last7-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    width: 100%;
+}
+.mini-circle {
+    width: 23px;
+    height: 23px;
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    cursor: default;
+    transition: transform 0.15s ease;
+    /* "visiblePainted" (SVG default) only responds to hover on painted
+       pixels - fill:none strokes leave the middle of the icon "dead" to the
+       mouse. Forcing pointer-events:all on the whole icon area (including
+       its transparent bits) keeps the tooltip responsive everywhere inside
+       the 26x26 box, not just directly over a stroke line. */
+    pointer-events: all;
+}
+.mini-circle:hover {
+    transform: scale(1.25);
+    z-index: 20;
+}
+.mini-circle svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    pointer-events: all;
+}
+.mini-circle svg * {
+    pointer-events: all;
+}
+
+.th-last7 { text-align: center !important; }
+.td-last7 {
+    white-space: nowrap;
+    text-align: center;
+    overflow: visible !important;
+    padding: 8px 4px !important;
+    display: table-cell;
+    vertical-align: middle;
+}
+.last7-row {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 4px;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+}
+
+/* Hint pill telling the user the Last 7 Execution icons are hoverable.
+   Sits in the toolbar row, pushed to the far right via margin-left:auto
+   on the element itself, reusing the same soft-blue "chip" language as
+   .badge-pass / .desc-chip elsewhere in this report for visual consistency. */
+.last7-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: linear-gradient(90deg, #eff6ff, #e0ecff);
+    color: #1e40af;
+    border: 1px solid #bfdbfe;
+    padding: 8px 14px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    font-weight: 600;
+    letter-spacing: 0.1px;
+    white-space: nowrap;
+}
+.last7-hint-icon {
+    font-size: 1.1em;
+    line-height: 1;
+}
+
+/* Floating tooltip lives in <body> so it can't be clipped by .table-container overflow */
+#miniTooltip {
+    position: fixed;
+    background: #1e293b;
+    color: #fff;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-family: 'Segoe UI', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.1px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-width: 280px;
+    text-align: center;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    z-index: 99999;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+    line-height: 1.45;
+}
+#miniTooltip.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+#miniTooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 7px solid transparent;
+    border-top-color: #1e293b;
+}
+
+/* ===== General Layout ===== */
+body { font-family: 'Segoe UI', sans-serif; background:#f0f4fa; margin:0; color:#333; }
+.header { display:flex; justify-content:space-between; align-items:center; background:linear-gradient(33deg,#8db5f1,#021e49); color:white; padding:10px 20px; }
+.header img { height:40px; }
+.summary-band { background:#0e4494; color:white; display:flex; justify-content:center; gap:30px; padding:8px; font-weight:600; flex-wrap:wrap; }
+.summary-band div { display:flex; align-items:center; gap:5px; }
+.main { display:flex; gap:20px; padding:20px; flex-wrap:wrap; }
+.chart-container { flex:1; display:flex; justify-content:center; align-items:center; min-width:250px; }
+.table-container { flex:1; background:white; padding:15px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.1); overflow-x:hidden; box-sizing:border-box; min-width:300px; width:100%; }
+.table-container table { width:100%; border-collapse:collapse; }
+.table-container th, .table-container td { padding:8px; border-bottom:1px solid #eee; text-align:left; }
+.table-container th { background:#002b6b; color:white; }
+.table-container tbody tr { transition: background 0.15s; cursor: pointer; }
+.table-container tbody tr:hover { background: #eaf2ff !important; box-shadow: inset 3px 0 0 #1a6fd4; }
+.footer { text-align:center; font-size:0.8em; padding:10px; background:#f1f1f1; margin-top:20px; }
+.detailed-section { display: none; }
+
+/* ===== Detail Table ===== */
+#testcaseTable {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 1em;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 16px rgba(14,68,148,0.10);
+}
+#testcaseTable thead tr {
+    background: linear-gradient(90deg, #0e4494 0%, #1a6fd4 100%);
+}
+#testcaseTable thead th {
+    color: #fff;
+    font-weight: 700;
+    padding: 14px 10px;
+    text-align: left;
+    font-size: 0.88em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border: none;
+    white-space: nowrap;
+}
+#testcaseTable thead th.th-expand { width: 40px; text-align: center; }
+#testcaseTable tbody tr:not(.details-row) {
+    background: #fff;
+    transition: background 0.18s;
+    cursor: pointer;
+}
+#testcaseTable tbody tr:not(.details-row):nth-child(even) {
+    background: #f7f9fd;
+}
+#testcaseTable tbody tr:not(.details-row):hover {
+    background: #eaf2ff !important;
+}
+#testcaseTable tbody td {
+    padding: 12px 10px;
+    border-bottom: 1px solid #e8eef5;
+    vertical-align: middle;
+}
+.td-module { font-weight: 600; color: #1e293b; font-size: 0.98em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.td-tcid { font-family: 'Courier New', monospace; font-size: 0.94em; color: #2563eb; font-weight: 700; letter-spacing: 0.3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.td-desc { vertical-align: middle; }
+/* table-layout:fixed keeps each column at its assigned width.
+   The description cell wraps text inside its column so the row height is
+   driven only by the content of that run, not by neighbouring cells growing. */
+#testcaseTable tbody tr:not(.details-row) td {
+    box-sizing: border-box;
+    vertical-align: middle;
+}
+/* Only clip module and tcid columns — never the Last 7 column */
+#testcaseTable tbody td.td-module,
+#testcaseTable tbody td.td-tcid {
+    overflow: hidden;
+}
+.desc-chip {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    background: linear-gradient(90deg, #eff6ff, #e0ecff);
+    color: #1e40af;
+    border: 1px solid #bfdbfe;
+    border-radius: 6px;
+    padding: 7px 12px;
+    font-size: 0.91em;
+    font-weight: 600;
+    letter-spacing: 0.1px;
+    white-space: normal;
+    word-break: break-word;
+    overflow: hidden;
+    line-height: 1.5;
+    vertical-align: middle;
+    box-sizing: border-box;
+    width: 100%;
+    max-height: calc(2 * 1.5em + 14px);
+}
+.td-date { font-size: 0.92em; color: #475569; font-weight: 500; white-space: nowrap; }
+.td-dur { font-size: 0.91em; color: #64748b; white-space: nowrap; text-align: center; }
+
+/* ===== Status Badges ===== */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 14px;
+    border-radius: 20px;
+    font-size: 0.88em;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    white-space: nowrap;
+}
+.badge-pass { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+.badge-fail { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+.badge-skip { background: #fef9c3; color: #92400e; border: 1px solid #fde68a; }
+
+/* ===== Expand Chevron ===== */
+.expand-icon { text-align: center; width: 36px; }
+.chevron {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: #f1f5f9;
+    color: #666;
+    font-size: 10px;
+    transition: all 0.2s ease;
+    border: 1px solid #e2e8f0;
+}
+#testcaseTable tbody tr:hover .chevron {
+    background: #dbeafe;
+    color: #1d4ed8;
+    border-color: #93c5fd;
+}
+
+/* ===== Video Button ===== */
+.video-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: linear-gradient(90deg, #0e4494, #2563eb);
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 0.9em;
+    font-weight: 600;
+    text-decoration: none;
+    transition: opacity 0.15s, transform 0.15s;
+    box-shadow: 0 2px 6px rgba(14,68,148,0.25);
+}
+.video-btn:hover { opacity: 0.92; transform: translateY(-1px); }
+.video-btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px; height: 16px;
+    background: rgba(255,255,255,0.22);
+    border-radius: 50%;
+    font-size: 9px;
+    padding-left: 2px;
+    line-height: 1;
+}
+
+/* ===== Step Table ===== */
+.step-table { width:95%; margin:10px auto; border-collapse:collapse; font-size:0.85em; table-layout:fixed; border-radius:8px; overflow:hidden; }
+.step-table th, .step-table td { border:1px solid #e2e8f0; padding:9px 10px; text-align:left; word-wrap:break-word; overflow-wrap:break-word; }
+.step-table th { background: linear-gradient(90deg,#1e293b,#334155); color:#fff; font-size:0.82em; text-transform:uppercase; letter-spacing:0.5px; }
+.step-table tbody tr { transition: background 0.15s; }
+.step-table tbody tr:hover { background: #eaf2ff !important; }
+.step-table td:nth-child(1), .step-table th:nth-child(1) { width:30%; }
+.step-table td:nth-child(2), .step-table th:nth-child(2) { width:25%; }
+.step-table td:nth-child(3), .step-table th:nth-child(3) { width:25%; }
+.step-table td:nth-child(4), .step-table th:nth-child(4) { width:10%; text-align:center; }
+.step-table td:nth-child(5), .step-table th:nth-child(5) { width:10%; text-align:center; }
+.screenshot { max-width:80px; max-height:80px; object-fit:cover; cursor:pointer; border:1px solid #ccc; border-radius:4px; }
+.api-body-pre { background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:10px; font-size:12px; max-height:300px; overflow:auto; white-space:pre-wrap; word-break:break-word; }
+
+/* ===== Performance Report: scenario / call / tab accordion cards ===== */
+.perf-list { display:flex; flex-direction:column; gap:12px; padding:10px 0; }
+.perf-card { border:1px solid #e2e8f0; border-radius:10px; overflow:hidden; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,0.04); }
+.perf-card-header { display:flex; align-items:center; gap:14px; padding:14px 16px; cursor:pointer; background:#f8fafc; transition:background 0.15s; }
+.perf-card-header:hover { background:#eef2ff; }
+.perf-card-header .chevron { color:#0e4494; font-size:13px; flex-shrink:0; }
+.perf-card-meta { flex:1; min-width:0; }
+.perf-card-title { font-weight:700; color:#1e293b; font-size:0.95em; }
+.perf-tcid-chip { display:inline-block; margin-left:8px; padding:2px 8px; border-radius:12px; background:#e0e7ff; color:#3730a3; font-size:0.78em; font-weight:600; }
+.perf-card-desc { color:#64748b; font-size:0.85em; margin-top:2px; }
+.perf-card-stats { display:flex; align-items:center; gap:10px; flex-shrink:0; }
+.perf-calls-badge { background:#e2e8f0; color:#334155; padding:4px 10px; border-radius:12px; font-size:0.78em; font-weight:600; white-space:nowrap; }
+.perf-error-badge { background:#fdecea; color:#dc3545; padding:4px 10px; border-radius:12px; font-size:0.78em; font-weight:700; white-space:nowrap; }
+.perf-avg-badge { font-weight:700; font-size:0.9em; white-space:nowrap; }
+.perf-card-body { padding:12px 16px; background:#fff; border-top:1px solid #e2e8f0; display:flex; flex-direction:column; gap:8px; }
+.perf-call { border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; }
+.perf-call-error { border-color:#f5c2c7; }
+.perf-call-header { display:flex; align-items:center; gap:12px; padding:10px 12px; cursor:pointer; background:#fafafa; }
+.perf-call-header:hover { background:#f1f5f9; }
+.perf-call-header .chevron { color:#0e4494; font-size:12px; flex-shrink:0; }
+.perf-call-method { font-weight:700; font-size:0.8em; padding:2px 8px; border-radius:4px; background:#1e293b; color:#fff; flex-shrink:0; }
+.perf-call-url { flex:1; min-width:0; word-break:break-all; font-size:0.85em; color:#334155; }
+.perf-call-status { flex-shrink:0; font-size:0.85em; }
+.perf-call-time { flex-shrink:0; font-size:0.85em; color:#64748b; font-family:monospace; }
+.perf-call-body { padding:12px; background:#fff; border-top:1px solid #e2e8f0; }
+.perf-tabs { display:flex; flex-direction:column; gap:6px; }
+.perf-tab-label { cursor:pointer; padding:8px 10px; background:#f1f5f9; border-radius:6px; font-size:0.83em; font-weight:600; color:#334155; }
+.perf-tab-label:hover { background:#e2e8f0; }
+.perf-tab-content { margin-top:4px; }
+.environment-ribbon { background:#f4f6f8; padding:10px; font-size:0.9em; border-bottom:1px solid #ddd; display:flex; justify-content:space-around; flex-wrap:wrap; gap:8px; }
+.toolbar input, .toolbar select, .toolbar button { padding:6px 10px; border-radius:5px; border:1px solid #ccc; }
+.toolbar button { background:#007bff; color:white; border:none; cursor:pointer; }
+
+/* ===== Lightbox Modal ===== */
+.modal {
+    display: none; position: fixed; z-index: 9999;
+    padding-top: 60px; left: 0; top: 0;
+    width: 100%; height: 100%; overflow: auto;
+    background-color: rgba(0,0,0,0.9);
+}
+.modal-content { display:block; margin:auto; max-width:80%; max-height:80%; }
+video.modal-content { width:80%; background:black; }
+#closeModal {
+    position:absolute; top:20px; right:35px;
+    color:#fff; font-size:30px; font-weight:bold; cursor:pointer;
+}
+.chart-container canvas { max-width:300px !important; max-height:300px !important; }
+.detailed-report-link { text-align:right; padding:10px; display:block; }
+.detailed-report-link a { text-decoration:none; }
+.back-btn {
+    background: linear-gradient(90deg, #0e4494 0%, #1a6fd4 100%);
+    color: #fff;
+    padding: 10px 22px;
+    border-radius: 999px;
+    text-decoration: none;
+    box-shadow: 0 4px 14px rgba(14,68,148,0.30);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 14px 0;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.95em;
+    letter-spacing: 0.2px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+    border: none;
+}
+.back-btn:hover {
+    opacity: 0.95;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(14,68,148,0.36);
+}
+.back-btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.05em;
+    line-height: 1;
+}
+.status-pass { color:#28a745; font-weight:bold; }
+.status-fail { color:#dc3545; font-weight:bold; }
+.status-skipped { color:#ffc107; font-weight:bold; }
+.sla-pass { color:#28a745; font-weight:bold; }
+.sla-fail { color:#dc3545; font-weight:bold; }
+</style>
+</head>
+<body>
+
+<!-- ===== Summary Section ===== -->
+<div id="summary-section">
+    <div class="header">
+        <img alt="Company Logo" src="https://www.resulticks.com/images/logos/resulticks-logo-blue.svg"/>
+        <h2>Automation Test Summary Report</h2>
+        <img alt="Product Logo" src="https://run19.resul.io/assets/resulticks-logo-white-391eec89.svg"/>
+    </div>
+    <div class="summary-band">
+        <div>📊 Total: 1</div>
+        <div>✅ Passed: 0</div>
+        <div>❌ Failed: 1</div>
+        <div>⚠️ Skipped: 0</div>
+        <div>⏱️ Duration: 00:02:33</div>
+        <div>🎯 SLA: 90%</div>
+        <div>🎯 Pass Rate: 0.00%</div>
+    </div>
+    <div class="detailed-report-link">
+        <a class="back-btn" onclick="showDetailedReport()"><span class="back-btn-icon">&#8594;</span> Detailed Report</a>
+        <a class="back-btn" onclick="showPerformanceReport()"><span class="back-btn-icon">&#8594;</span> Performance Report</a>
+    </div>
+    <div class="main">
+        <div class="chart-container">
+            <canvas id="chart1"></canvas>
+        </div>
+        <div class="table-container">
+            <h3>Module-wise Results</h3>
+            <table>
+                <tr><th>Module</th><th>Total</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Duration</th><th>SLA %</th><th>Pass %</th></tr>
+                <tbody id="moduleTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+    <div class="footer">
+        Report generated on <span id="current-datetime">26-08-19 21:01:41</span> |
+        Contact: <a href="mailto:qaautomation@resulticks.com">qaautomation@resulticks.com</a>
+    </div>
+</div>
+
+<!-- ===== Detailed Section ===== -->
+<div id="detailed-section" class="detailed-section" style="padding:20px; box-sizing:border-box; width:100%;">
+    <div class="header"><img alt="Company Logo" src="https://www.resulticks.com/images/logos/resulticks-logo-blue.svg"/><h2>Detail Test Report</h2><img alt="Product Logo" src="https://run.resulticks.com/assets/resulticks-logo-white-391eec89.svg"/></div><div class="environment-ribbon"><span><strong>Environment:</strong> Team</span><span><strong>Browser:</strong> chrome</span><span><strong>Release:</strong> 5.0</span><span><strong>Execution Date:</strong> 26-08-19 21:01:41</span></div><div style="text-align:right; padding:10px;"><a class="back-btn" onclick="showSummaryReport()"><span class="back-btn-icon">&#8592;</span> Back to Summary</a></div><div class="table-container"><h3>Test Case Results</h3><div class="toolbar"><div style="display:flex; gap:15px; flex-wrap:wrap; align-items:center; margin:20px 0;"><div><label><b>Search:</b></label><input id="searchInput" placeholder="Search test cases..." type="text"/></div><div><label><b>Filter by Status:</b></label><select id="statusFilter"><option value="">All</option><option value="PASS">Passed</option><option value="FAIL">Failed</option><option value="SKIPPED">Skipped</option></select></div><div class="last7-hint" style="margin-left:auto;"><span class="last7-hint-icon">&#9432;</span>Hover over the icons under <b>Last&nbsp;7&nbsp;Execution</b> to view the date &amp; result</div></div></div><table id="testcaseTable">
+<colgroup>
+  <col style="width:40px">
+  <col style="width:11%">
+  <col style="width:10%">
+  <col>
+  <col style="width:9%">
+  <col style="width:8%">
+  <col style="width:10%">
+  <col style="width:26%">
+</colgroup>
+<thead><tr>
+  <th class="th-expand"></th>
+  <th>Module</th>
+  <th>Test Case ID</th>
+  <th>Description</th>
+  <th style="text-align:center;">Status</th>
+  <th style="text-align:center;">Duration</th>
+  <th style="text-align:center;">Video</th>
+  <th class="th-last7">Last 7 Execution</th>
+</tr></thead><tbody><tr data-test-id="tc1" data-status="FAIL" data-expanded="false" data-module="AUDIENCE" data-testcaseid="RS-T101" data-rundate="26-08-19 2" data-duration="135s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">AUDIENCE</td><td class="td-tcid">RS-T101</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Validate audience grid and field selector functionality">Validate audience grid and field selector functionality</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">135s</td><td style="text-align:center;"><span style='color:#bbb'>—</span></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-pass" data-tooltip="Tue, 28 Jul 2026 - Pass"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M4.3 12.8 L9.6 18.1 L19.7 5.9" fill="none" stroke="#2fb344" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="mini-circle mini-pass" data-tooltip="Thu, 30 Jul 2026 - Pass"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M4.3 12.8 L9.6 18.1 L19.7 5.9" fill="none" stroke="#2fb344" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="mini-circle mini-pass" data-tooltip="Sun, 02 Aug 2026 - Pass"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M4.3 12.8 L9.6 18.1 L19.7 5.9" fill="none" stroke="#2fb344" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="mini-circle mini-fail" data-tooltip="Mon, 03 Aug 2026 - Fail"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M5.2 5.2 L18.8 18.8 M18.8 5.2 L5.2 18.8" stroke="#e4483f" stroke-width="3.2" stroke-linecap="round"/></svg></span><span class="mini-circle mini-pass" data-tooltip="Tue, 04 Aug 2026 - Pass"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M4.3 12.8 L9.6 18.1 L19.7 5.9" fill="none" stroke="#2fb344" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="mini-circle mini-fail" data-tooltip="Wed, 05 Aug 2026 - Fail"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M5.2 5.2 L18.8 18.8 M18.8 5.2 L5.2 18.8" stroke="#e4483f" stroke-width="3.2" stroke-linecap="round"/></svg></span><span class="mini-circle mini-fail" data-tooltip="Wed, 19 Aug 2026 - Fail"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M5.2 5.2 L18.8 18.8 M18.8 5.2 L5.2 18.8" stroke="#e4483f" stroke-width="3.2" stroke-linecap="round"/></svg></span></div></td></tr><tr class="details-row" id="tc1-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>the user logs in to the platform</td><td>User should log in to the platform successfully</td><td>User logged in successfully and navigated to TEAM_5.0https://reacuix.resul.io/.</td><td>✅</td><td><img class="screenshot" src="file:///C:/Users/VijayManoharan/PycharmProjects/ResulPy/screenshots/master/RS-T101_20260819205942927461.jpg"/></td></tr><tr><td>Click the master data management page</td><td>User should navigate to the master data management page</td><td>User navigate to the master data management page successfully.</td><td>✅</td><td><img class="screenshot" src="file:///C:/Users/VijayManoharan/PycharmProjects/ResulPy/screenshots/master/RS-T101_20260819210020592055.jpg"/></td></tr><tr><td>Verify the audience grid count</td><td>Audience grid count should be displayed as expected</td><td>Audience grid count is displayed as expected</td><td>✅</td><td><img class="screenshot" src="file:///C:/Users/VijayManoharan/PycharmProjects/ResulPy/screenshots/master/RS-T101_20260819210030747108.jpg"/></td></tr><tr><td>Click the field selector</td><td>Field selector should be able to clickable</td><td>Field selector is clicked successfully</td><td>✅</td><td><img class="screenshot" src="file:///C:/Users/VijayManoharan/PycharmProjects/ResulPy/screenshots/master/RS-T101_20260819210039530059.jpg"/></td></tr><tr><td>Get available attribute name</td><td>Attribute name should be fetched from available attributes list</td><td>Fetched attribute name: 24/7 Emergency Service</td><td>✅</td><td><img class="screenshot" src="file:///C:/Users/VijayManoharan/PycharmProjects/ResulPy/screenshots/master/RS-T101_20260819210041608867.jpg"/></td></tr><tr><td>Verify audience grid search functionality</td><td>Search should filter results based on attribute name</td><td>Search functionality failed</td><td>❌</td><td><img class="screenshot" src="file:///C:/Users/VijayManoharan/PycharmProjects/ResulPy/screenshots/master/RS-T101_20260819210044776059.jpg"/></td></tr><tr><td>Verify searched attribute in available list</td><td>Searched attribute should be displayed in available attributes</td><td>Attribute is not displayed</td><td>❌</td><td><img class="screenshot" src="file:///C:/Users/VijayManoharan/PycharmProjects/ResulPy/screenshots/master/RS-T101_20260819210045300505.jpg"/></td></tr><tr><td>Verify clear search functionality</td><td>Search field should be cleared and all attributes displayed</td><td>Search cleared successfully</td><td>✅</td><td><img class="screenshot" src="file:///C:/Users/VijayManoharan/PycharmProjects/ResulPy/screenshots/master/RS-T101_20260819210046647935.jpg"/></td></tr><tr><td>Move attribute to selected list</td><td>Attribute should be moved from available to selected list</td><td>Attribute &#39;24/7 Emergency Service&#39; moved successfully</td><td>✅</td><td><img class="screenshot" src="file:///C:/Users/VijayManoharan/PycharmProjects/ResulPy/screenshots/master/RS-T101_20260819210048941495.jpg"/></td></tr><tr><td>Click selected attribute search</td><td>Selected attribute search field should be clickable</td><td>Clicked successfully</td><td>✅</td><td><img class="screenshot" src="file:///C:/Users/VijayManoharan/PycharmProjects/ResulPy/screenshots/master/RS-T101_20260819210053342053.jpg"/></td></tr><tr><td>Search moved attribute in selected list</td><td>Moved attribute should be searchable in selected list</td><td>Searched attribute &#39;24/7 Emergency Service&#39; successfully</td><td>✅</td><td><img class="screenshot" src="file:///C:/Users/VijayManoharan/PycharmProjects/ResulPy/screenshots/master/RS-T101_20260819210054585677.jpg"/></td></tr><tr><td>Verify attribute in selected list</td><td>Attribute should be present in selected attributes list</td><td>Attribute not found</td><td>❌</td><td><img class="screenshot" src="file:///C:/Users/VijayManoharan/PycharmProjects/ResulPy/screenshots/master/RS-T101_20260819210055037101.jpg"/></td></tr><tr><td>Click apply button in field selector</td><td>Changes should be applied successfully</td><td>Apply button clicked successfully</td><td>✅</td><td><img class="screenshot" src="file:///C:/Users/VijayManoharan/PycharmProjects/ResulPy/screenshots/master/RS-T101_20260819210117184080.jpg"/></td></tr><tr><td>Verify attribute in audience grid header</td><td>Selected attribute should be visible in grid header</td><td>Attribute visible in grid header</td><td>✅</td><td><img class="screenshot" src="file:///C:/Users/VijayManoharan/PycharmProjects/ResulPy/screenshots/master/RS-T101_20260819210119085764.jpg"/></td></tr></table></td></tr></tbody></table></div>
+<script>
+function toggleDetails(row) {
+    // row could be the <tr> itself (passed from onclick on the expand td)
+    if (!row || !row.getAttribute) return;
+    var detailsRow = document.getElementById(row.getAttribute('data-test-id') + '-details');
+    if (!detailsRow) return;
+    var expandIcon = row.querySelector('.expand-icon .chevron');
+    if (detailsRow.style.display === 'none') {
+        detailsRow.style.display = 'table-row';
+        row.setAttribute('data-expanded', 'true');
+        if (expandIcon) { expandIcon.innerHTML = '&#9660;'; expandIcon.style.color = '#0e4494'; }
+    } else {
+        detailsRow.style.display = 'none';
+        row.setAttribute('data-expanded', 'false');
+        if (expandIcon) { expandIcon.innerHTML = '&#9654;'; expandIcon.style.color = '#666'; }
+    }
+}
+
+function playVideoHandler(event, element) {
+    event.stopPropagation();
+    event.preventDefault();
+    var modal = document.getElementById('lightboxModal');
+    var modalImg = document.getElementById('lightboxImage');
+    var modalVideo = document.getElementById('lightboxVideo');
+    if (modal && modalImg && modalVideo) {
+        modalImg.style.display = 'none';
+        modalImg.src = '';
+        modalVideo.src = element.getAttribute('data-video');
+        modalVideo.style.display = 'block';
+        modal.style.display = 'block';
+        modalVideo.play();
+    }
+}
+
+function applySearchAndFilter() {
+    var searchText = document.getElementById('searchInput').value.toLowerCase().trim();
+    var filterValue = document.getElementById('statusFilter').value;
+    var mainRows = document.querySelectorAll('#testcaseTable > tbody > tr:not(.details-row)');
+    mainRows.forEach(function(row) {
+        var rowText = row.textContent.toLowerCase();
+        var rowStatus = row.getAttribute('data-status') || '';
+        var matchesSearch = !searchText || rowText.includes(searchText);
+        var matchesFilter = !filterValue || rowStatus === filterValue;
+        var shouldShow = matchesSearch && matchesFilter;
+        var testId = row.getAttribute('data-test-id');
+        var detailsRow = document.getElementById(testId + '-details');
+        if (shouldShow) {
+            row.style.display = '';
+            if (detailsRow) {
+                var expanded = row.getAttribute('data-expanded') === 'true';
+                detailsRow.style.display = expanded ? 'table-row' : 'none';
+            }
+        } else {
+            row.style.display = 'none';
+            if (detailsRow) detailsRow.style.display = 'none';
+            var ch = row.querySelector('.expand-icon .chevron');
+            if (ch) { ch.innerHTML = '&#9654;'; ch.style.color = '#666'; }
+            row.setAttribute('data-expanded', 'false');
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    var searchInput = document.getElementById('searchInput');
+    var statusFilter = document.getElementById('statusFilter');
+    if (searchInput) searchInput.addEventListener('input', applySearchAndFilter);
+    if (statusFilter) statusFilter.addEventListener('change', applySearchAndFilter);
+});
+</script>
+        
+</div>
+
+<!-- ===== Network Performance Section ===== -->
+<div id="performance-section" class="detailed-section" style="padding:20px; box-sizing:border-box; width:100%;">
+    <div class="header"><img alt="Company Logo" src="https://www.resulticks.com/images/logos/resulticks-logo-blue.svg"/><h2>Performance Report</h2><img alt="Product Logo" src="https://run.resulticks.com/assets/resulticks-logo-white-391eec89.svg"/></div><div class="environment-ribbon"><span><strong>Environment:</strong> Team</span><span><strong>Browser:</strong> chrome</span><span><strong>Release:</strong> 5.0</span><span><strong>Execution Date:</strong> 26-08-19 21:01:41</span></div><div style="text-align:right; padding:10px;"><a class="back-btn" onclick="showSummaryReport()"><span class="back-btn-icon">&#8592;</span> Back to Summary</a></div><div class="table-container"><h3>Network Performance</h3><div class="toolbar"><div style="display:flex; gap:15px; flex-wrap:wrap; margin:20px 0;"><div><label><b>Search:</b></label><input id="perfSearchInput" placeholder="Search scenarios..." type="text"/></div></div></div><div id="perfList" class="perf-list"><div class="perf-card" data-search-text="AUDIENCE RS-T101 Validate audience grid and field selector functionality"><div class="perf-card-header" data-perf-id="perf1" data-expanded="false" onclick="togglePerfDetails(this)"><span class="chevron">&#9654;</span><div class="perf-card-meta"><div class="perf-card-title">AUDIENCE <span class="perf-tcid-chip">RS-T101</span></div><div class="perf-card-desc">Validate audience grid and field selector functionality</div></div><div class="perf-card-stats"><span class="perf-calls-badge">26 calls</span><span class="perf-avg-badge" style="color:#dc3545;">2875 ms avg</span></div></div><div class="perf-card-body" id="perf1-details" style="display:none;"><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call1" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">GET</span><span class="perf-call-url">https://geolocation-db.com/json/</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">2737 ms</span></div><div class="perf-call-body" id="perf1-call1-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call1-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call1-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;geolocation-db.com&quot;,
+  &quot;:method&quot;: &quot;GET&quot;,
+  &quot;:path&quot;: &quot;/json/&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;application/json, text/plain, */*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;origin&quot;: &quot;https://reacuix.resul.io&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://reacuix.resul.io/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;cross-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call1-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call1-reqpayload-content" style="display:none;">-</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call1-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call1-response-content" style="display:none;">{
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;content-encoding&quot;: &quot;gzip&quot;,
+  &quot;content-type&quot;: &quot;text/html; charset=UTF-8&quot;,
+  &quot;date&quot;: &quot;Wed, 19 Aug 2026 15:29:20 GMT&quot;,
+  &quot;server&quot;: &quot;nginx/1.14.0 (Ubuntu)&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call1-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call1-resppayload-content" style="display:none;">{
+  &quot;country_code&quot;: &quot;IN&quot;,
+  &quot;country_name&quot;: &quot;India&quot;,
+  &quot;city&quot;: null,
+  &quot;postal&quot;: null,
+  &quot;latitude&quot;: 20,
+  &quot;longitude&quot;: 77,
+  &quot;IPv4&quot;: &quot;116.212.183.147&quot;,
+  &quot;state&quot;: null
+}</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call2" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://wiz.resul.io/AccountSetup/GetIPData</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 201</span><span class="perf-call-time">2064 ms</span></div><div class="perf-call-body" id="perf1-call2-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call2-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call2-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;wiz.resul.io&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/AccountSetup/GetIPData&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;application/json, text/plain, */*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;authorization&quot;: &quot;Bearer null&quot;,
+  &quot;content-length&quot;: &quot;31&quot;,
+  &quot;content-type&quot;: &quot;application/json&quot;,
+  &quot;origin&quot;: &quot;https://reacuix.resul.io&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://reacuix.resul.io/&quot;,
+  &quot;reqs&quot;: &quot;null&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;,
+  &quot;x-forwarded-for&quot;: &quot;null&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call2-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call2-reqpayload-content" style="display:none;">{
+  &quot;ipaddress&quot;: &quot;116.212.183.147&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call2-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call2-response-content" style="display:none;">{
+  &quot;access-control-allow-credentials&quot;: &quot;true&quot;,
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;alt-svc&quot;: &quot;h3=\&quot;:443\&quot;; ma=86400&quot;,
+  &quot;cf-cache-status&quot;: &quot;DYNAMIC&quot;,
+  &quot;cf-ray&quot;: &quot;a2da317d9d297f22-MAA&quot;,
+  &quot;content-encoding&quot;: &quot;br&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=utf-8&quot;,
+  &quot;date&quot;: &quot;Wed, 19 Aug 2026 15:29:22 GMT&quot;,
+  &quot;origin_request_header&quot;: &quot;*&quot;,
+  &quot;server&quot;: &quot;cloudflare&quot;,
+  &quot;strict-transport-security&quot;: &quot;max-age=15552000; includeSubDomains; preload&quot;,
+  &quot;vary&quot;: &quot;Accept-Encoding, Origin&quot;,
+  &quot;via&quot;: &quot;1.1 google&quot;,
+  &quot;x-content-type-options&quot;: &quot;nosniff&quot;,
+  &quot;x-frame-options&quot;: &quot;SAMEORIGIN&quot;,
+  &quot;x-xss-protection&quot;: &quot;1; mode=block&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call2-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call2-resppayload-content" style="display:none;">{
+  &quot;status&quot;: true,
+  &quot;message&quot;: &quot;Successfull&quot;,
+  &quot;data&quot;: {
+    &quot;latitude&quot;: &quot;13.0895&quot;,
+    &quot;longitude&quot;: &quot;80.2739&quot;,
+    &quot;country&quot;: &quot;India&quot;,
+    &quot;countryCode&quot;: &quot;IN&quot;,
+    &quot;city&quot;: &quot;Chennai&quot;,
+    &quot;location&quot;: &quot;TN&quot;,
+    &quot;istCode&quot;: &quot;91&quot;,
+    &quot;countryID&quot;: 3,
+    &quot;currencyID&quot;: 1,
+    &quot;defaultLanguageID&quot;: 1,
+    &quot;defaultDateformatID&quot;: 2,
+    &quot;defaultTimeFormatID&quot;: 0,
+    &quot;defaultTimeZoneID&quot;: 64
+  }
+}</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call3" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://wiz.resul.io/AccountSetup/CheckEmailExists</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">1547 ms</span></div><div class="perf-call-body" id="perf1-call3-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call3-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call3-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;wiz.resul.io&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/AccountSetup/CheckEmailExists&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;application/json, text/plain, */*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;authorization&quot;: &quot;Bearer null&quot;,
+  &quot;content-length&quot;: &quot;123&quot;,
+  &quot;content-type&quot;: &quot;application/json&quot;,
+  &quot;origin&quot;: &quot;https://reacuix.resul.io&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://reacuix.resul.io/&quot;,
+  &quot;reqs&quot;: &quot;null&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;,
+  &quot;x-forwarded-for&quot;: &quot;null&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call3-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call3-reqpayload-content" style="display:none;">{
+  &quot;emailId&quot;: &quot;pgKXA7UwF2OP7Uabdb/a16FGd2z0xb69yRpFdiDvPRMzOjfDSLEc9vtqWUWmS8zy&quot;,
+  &quot;hashval&quot;: &quot;anlSbDtHOXttZ1dRP0NxJl9XIjJHYg==&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call3-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call3-response-content" style="display:none;">{
+  &quot;access-control-allow-credentials&quot;: &quot;true&quot;,
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;alt-svc&quot;: &quot;h3=\&quot;:443\&quot;; ma=86400&quot;,
+  &quot;cf-cache-status&quot;: &quot;DYNAMIC&quot;,
+  &quot;cf-ray&quot;: &quot;a2da318cafc27f22-MAA&quot;,
+  &quot;content-encoding&quot;: &quot;br&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=utf-8&quot;,
+  &quot;date&quot;: &quot;Wed, 19 Aug 2026 15:29:24 GMT&quot;,
+  &quot;origin_request_header&quot;: &quot;*&quot;,
+  &quot;server&quot;: &quot;cloudflare&quot;,
+  &quot;strict-transport-security&quot;: &quot;max-age=15552000; includeSubDomains; preload&quot;,
+  &quot;vary&quot;: &quot;Accept-Encoding, Origin&quot;,
+  &quot;via&quot;: &quot;1.1 google&quot;,
+  &quot;x-content-type-options&quot;: &quot;nosniff&quot;,
+  &quot;x-frame-options&quot;: &quot;SAMEORIGIN&quot;,
+  &quot;x-xss-protection&quot;: &quot;1; mode=block&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call3-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call3-resppayload-content" style="display:none;">{
+  &quot;status&quot;: true,
+  &quot;message&quot;: &quot;Email already exist&quot;,
+  &quot;data&quot;: {}
+}</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call4" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://wiz.resul.io/AccountSetup/GetMasterData</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">8476 ms</span></div><div class="perf-call-body" id="perf1-call4-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call4-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call4-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;wiz.resul.io&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/AccountSetup/GetMasterData&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;application/json, text/plain, */*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;authorization&quot;: &quot;Bearer null&quot;,
+  &quot;content-length&quot;: &quot;2&quot;,
+  &quot;content-type&quot;: &quot;application/json&quot;,
+  &quot;origin&quot;: &quot;https://reacuix.resul.io&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://reacuix.resul.io/&quot;,
+  &quot;reqs&quot;: &quot;null&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;,
+  &quot;x-forwarded-for&quot;: &quot;null&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call4-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call4-reqpayload-content" style="display:none;">{}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call4-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call4-response-content" style="display:none;">{
+  &quot;access-control-allow-credentials&quot;: &quot;true&quot;,
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;alt-svc&quot;: &quot;h3=\&quot;:443\&quot;; ma=86400&quot;,
+  &quot;cf-cache-status&quot;: &quot;DYNAMIC&quot;,
+  &quot;cf-ray&quot;: &quot;a2da3196dbba7f22-MAA&quot;,
+  &quot;content-encoding&quot;: &quot;br&quot;,
+  &quot;content-type&quot;: &quot;text/plain; charset=utf-8&quot;,
+  &quot;date&quot;: &quot;Wed, 19 Aug 2026 15:29:33 GMT&quot;,
+  &quot;origin_request_header&quot;: &quot;*&quot;,
+  &quot;server&quot;: &quot;cloudflare&quot;,
+  &quot;strict-transport-security&quot;: &quot;max-age=15552000; includeSubDomains; preload&quot;,
+  &quot;vary&quot;: &quot;Accept-Encoding, Origin&quot;,
+  &quot;via&quot;: &quot;1.1 google&quot;,
+  &quot;x-content-type-options&quot;: &quot;nosniff&quot;,
+  &quot;x-frame-options&quot;: &quot;SAMEORIGIN&quot;,
+  &quot;x-xss-protection&quot;: &quot;1; mode=block&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call4-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call4-resppayload-content" style="display:none;">{&quot;brandPositionList&quot;:[{&quot;brandPositionID&quot;:0,&quot;brandPositionName&quot;:&quot;Enterprise&quot;,&quot;clientType&quot;:2},{&quot;brandPositionID&quot;:1,&quot;brandPositionName&quot;:&quot;Luxury&quot;,&quot;clientType&quot;:2},{&quot;brandPositionID&quot;:2,&quot;brandPositionName&quot;:&quot;Premium&quot;,&quot;clientType&quot;:2},{&quot;brandPositionID&quot;:3,&quot;brandPositionName&quot;:&quot;Mass premium&quot;,&quot;clientType&quot;:2},{&quot;brandPositionID&quot;:4,&quot;brandPositionName&quot;:&quot;Low cost&quot;,&quot;clientType&quot;:2},{&quot;brandPositionID&quot;:5,&quot;brandPositionName&quot;:&quot;SME&quot;,&quot;clientType&quot;:1},{&quot;brandPositionID&quot;:6,&quot;brandPositionName&quot;:&quot;Mid-size&quot;,&quot;clientType&quot;:1},{&quot;brandPositionID&quot;:7,&quot;brandPositionName&quot;:&quot;Large enterprise&quot;,&quot;clientType&quot;:1},{&quot;brandPositionID&quot;:8,&quot;brandPositionName&quot;:&quot;Fortune 50&quot;,&quot;clientType&quot;:1},{&quot;brandPositionID&quot;:9,&quot;brandPositionName&quot;:&quot;Fortune 500&quot;,&quot;clientType&quot;:1},{&quot;brandPositionID&quot;:10,&quot;brandPositionName&quot;:&quot;Fortune 1000&quot;,&quot;clientType&quot;:1},{&quot;brandPositionID&quot;:11,&quot;brandPositionName&quot;:&quot;Private / Specialist&quot;,&quot;clientType&quot;:1},{&quot;brandPositionID&quot;:12,&quot;brandPositionName&quot;:&quot;FULL-service&quot;,&quot;clientType&quot;:1},{&quot;brandPositionID&quot;:13,&quot;brandPositionName&quot;:&quot;Mainstream&quot;,&quot;clientType&quot;:1},{&quot;brandPositionID&quot;:14,&quot;brandPositionName&quot;:&quot;VALUE&quot;,&quot;clientType&quot;:1},{&quot;brandPositionID&quot;:16,&quot;brandPositionName&quot;:&quot;MID-market&quot;,&quot;clientType&quot;:1},{&quot;brandPositionID&quot;:17,&quot;brandPositionName&quot;:&quot;SMB&quot;,&quot;clientType&quot;:1}],&quot;jobFunctionList&quot;:[{&quot;jobFunctionID&quot;:1,&quot;jobFunctionName&quot;:&quot;Others&quot;},{&quot;jobFunctionID&quot;:2,&quot;jobFunctionName&quot;:&quot;Creative Services&quot;},{&quot;jobFunctionID&quot;:3,&quot;jobFunctionName&quot;:&quot;Director&quot;},{&quot;jobFunctionID&quot;:4,&quot;jobFunctionName&quot;:&quot;Finance Manager&quot;},{&quot;jobFunctionID&quot;:5,&quot;jobFunctionName&quot;:&quot;IT/Infrastructure...</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call5" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://wiz.resul.io/Home/LoginValidate</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">4683 ms</span></div><div class="perf-call-body" id="perf1-call5-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call5-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call5-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;wiz.resul.io&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/Home/LoginValidate&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;application/json, text/plain, */*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;authorization&quot;: &quot;Bearer null&quot;,
+  &quot;content-length&quot;: &quot;407&quot;,
+  &quot;content-type&quot;: &quot;application/json&quot;,
+  &quot;origin&quot;: &quot;https://reacuix.resul.io&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://reacuix.resul.io/&quot;,
+  &quot;reqs&quot;: &quot;null&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;,
+  &quot;x-forwarded-for&quot;: &quot;null&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call5-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call5-reqpayload-content" style="display:none;">{
+  &quot;loginName&quot;: &quot;0Y6zd3o1+1bGS13ivPknCpRNxF3AYcMnVDhhV3Om0SX6mDfR6OndgZ3m+q92ZcNF&quot;,
+  &quot;loginPassword&quot;: &quot;whGJj9xwdVRB3fQnV4tVyw==&quot;,
+  &quot;userAgent&quot;: &quot;Chrome&quot;,
+  &quot;ipAddress&quot;: &quot;MTE2LjIxMi4xODMuMTQ3&quot;,
+  &quot;countryName&quot;: &quot;SW5kaWE=&quot;,
+  &quot;countryCode&quot;: &quot;SU4=&quot;,
+  &quot;rememberMe&quot;: false,
+  &quot;hashval&quot;: &quot;e006TypCT097emNyJSFbYXFrUClgXg==&quot;,
+  &quot;attempts&quot;: 0,
+  &quot;lastURL&quot;: &quot;&quot;,
+  &quot;oauth&quot;: &quot;0Y6zd3o1+1bGS13ivPknCpRNxF3AYcMnVDhhV3Om0SWInWv/RTA8y4uZ+c5wvLKU&quot;,
+  &quot;IsADuser&quot;: false
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call5-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call5-response-content" style="display:none;">{
+  &quot;access-control-allow-credentials&quot;: &quot;true&quot;,
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;alt-svc&quot;: &quot;h3=\&quot;:443\&quot;; ma=86400&quot;,
+  &quot;cf-cache-status&quot;: &quot;DYNAMIC&quot;,
+  &quot;cf-ray&quot;: &quot;a2da31cc4d5e7f22-MAA&quot;,
+  &quot;content-encoding&quot;: &quot;br&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=utf-8&quot;,
+  &quot;date&quot;: &quot;Wed, 19 Aug 2026 15:29:37 GMT&quot;,
+  &quot;origin_request_header&quot;: &quot;*&quot;,
+  &quot;server&quot;: &quot;cloudflare&quot;,
+  &quot;strict-transport-security&quot;: &quot;max-age=15552000; includeSubDomains; preload&quot;,
+  &quot;vary&quot;: &quot;Accept-Encoding, Origin&quot;,
+  &quot;via&quot;: &quot;1.1 google&quot;,
+  &quot;x-content-type-options&quot;: &quot;nosniff&quot;,
+  &quot;x-frame-options&quot;: &quot;SAMEORIGIN&quot;,
+  &quot;x-xss-protection&quot;: &quot;1; mode=block&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call5-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call5-resppayload-content" style="display:none;">{&quot;status&quot;:true,&quot;statuscode&quot;:101,&quot;message&quot;:&quot;Login Success&quot;,&quot;data&quot;:{&quot;isCampaign&quot;:true,&quot;departmentList&quot;:[{&quot;departmentId&quot;:3,&quot;clientId&quot;:6201,&quot;departmentName&quot;:&quot;AutomationGHQ3&quot;,&quot;brandId&quot;:510,&quot;brandName&quot;:&quot;EmailID&quot;,&quot;uiprintableName&quot;:&quot;EmailID&quot;,&quot;isRFA&quot;:false,&quot;isGenieEnabled&quot;:false},{&quot;departmentId&quot;:1,&quot;clientId&quot;:6201,&quot;departmentName&quot;:&quot;AutomationGHQ1&quot;,&quot;brandId&quot;:765,&quot;brandName&quot;:&quot;EMP_ID&quot;,&quot;uiprintableName&quot;:&quot;EMP_ID&quot;,&quot;isRFA&quot;:true,&quot;isGenieEnabled&quot;:false},{&quot;departmentId&quot;:2,&quot;clientId&quot;:6201,&quot;departmentName&quot;:&quot;AutomationGHQ2&quot;,&quot;brandId&quot;:383,&quot;brandName&quot;:&quot;EmailID&quot;,&quot;uiprintableName&quot;:&quot;EmailID&quot;,&quot;isRFA&quot;:false,&quot;isGenieEnabled&quot;:false},{&quot;departmentId&quot;:4,&quot;clientId&quot;:6201,&quot;departmentName&quot;:&quot;AutomationGHQ4&quot;,&quot;brandId&quot;:0,&quot;brandName&quot;:&quot;&quot;,&quot;uiprintableName&quot;:&quot;&quot;,&quot;isRFA&quot;:false,&quot;isGenieEnabled&quot;:false}],&quot;accountAdmin&quot;:{&quot;clientId&quot;:6200,&quot;clientName&quot;:&quot;QA_Test_GROUPS_10122025195702&quot;},&quot;clientList&quot;:[{&quot;clientId&quot;:6201,&quot;clientName&quot;:&quot;QA_Test_10122025195703&quot;,&quot;logoPath&quot;:&quot;/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAA...</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call6" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://sdk.resul.io/Campaign/getWebConfig</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 201</span><span class="perf-call-time">1290 ms</span></div><div class="perf-call-body" id="perf1-call6-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call6-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call6-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;sdk.resul.io&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/Campaign/getWebConfig&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;*/*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;content-length&quot;: &quot;109&quot;,
+  &quot;content-type&quot;: &quot;text/plain;charset=UTF-8&quot;,
+  &quot;isencryption&quot;: &quot;true&quot;,
+  &quot;origin&quot;: &quot;https://reacuix.resul.io&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://reacuix.resul.io/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call6-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call6-reqpayload-content" style="display:none;">enneyJkb21haW5OYW1lIjoiaHR0cHM6Ly9yZWFjdWl4LnJlc3VsLmlvIiwiZmFsbGJhY2tEb21haW4iOiJodHRwczovL3Jlc3VsLmlvIn0=$k</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call6-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call6-response-content" style="display:none;">{
+  &quot;access-control-allow-credentials&quot;: &quot;true&quot;,
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;alt-svc&quot;: &quot;h3=\&quot;:443\&quot;; ma=86400&quot;,
+  &quot;cache-control&quot;: &quot;no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0&quot;,
+  &quot;cf-cache-status&quot;: &quot;DYNAMIC&quot;,
+  &quot;cf-ray&quot;: &quot;a2da31f47d49a27c-MAA&quot;,
+  &quot;content-encoding&quot;: &quot;br&quot;,
+  &quot;content-security-policy&quot;: &quot;frame-ancestors &#39;self&#39; *.resul.io *.resu.io&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=utf-8&quot;,
+  &quot;date&quot;: &quot;Wed, 19 Aug 2026 15:29:41 GMT&quot;,
+  &quot;pragma&quot;: &quot;no-cache&quot;,
+  &quot;server&quot;: &quot;cloudflare&quot;,
+  &quot;strict-transport-security&quot;: &quot;max-age=31536000; includeSubDomains&quot;,
+  &quot;vary&quot;: &quot;Origin, Accept-Encoding&quot;,
+  &quot;via&quot;: &quot;1.1 google&quot;,
+  &quot;x-content-type-options&quot;: &quot;nosniff&quot;,
+  &quot;x-frame-options&quot;: &quot;ALLOW-FROM https://*.resul.io https://sdk.resul.io&quot;,
+  &quot;x-xss-protection&quot;: &quot;1; mode=block&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call6-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call6-resppayload-content" style="display:none;">{&quot;status&quot;:true,&quot;message&quot;:&quot;success&quot;,&quot;data&quot;:&quot;r2IeyJzdGF0dXMiOnRydWUsIm1lc3NhZ2UiOiJzdWNjZXNzIiwiZGF0YSI6ImtuZWV5SmtaWFpwWTJWQmNIQk5ZWEJKUkNJNmJuVnNiQ3dpZDJWaVkyOXVabWxuSWpvaVcxMGlMQ0p6Wkd0RmJtUlFiMmx1ZENJNkltaDBkSEJ6T2k4dmMyUnJMbkpsYzNWc0xtbHZMeUlzSW5SbGJtRnVkRWxrSWpvaVkzVnpkRjlrTWpSbU9XUmtNMTlqWTJNM1h6UXhOalpmT0RBeE5sODBZekppTmpRM01HVTJNVFVpTENKMFkyOWtaU0k2SW01S01pSXNJbVJsY0hSSlpDSTZJakVpTENKaVEyOWtaU0k2SWtVaUxDSnBjRUZrWkhKbGMzTWlPaUlpTENKbWFXVnNaRU5oY0hSMWNtVWlPbTUxYkd3c0lteHZZMkYwYVc5dUlqb2llMXdpUTI5MWJuUnllVndpT201MWJHd3NYQ0pEYjNWdWRISjVRMjlrWlZ3aU9tNTFiR3dzWENKU1pXZHBiMjVjSWpwdWRXeHNMRndpUTJsMGVWd2lPbTUxYkd3c1hDSlFiM04wWVd4RGIyUmxYQ0k2Ym5Wc2JDeGNJbE4wWVhSbFhDSTZiblZzYkN4Y0lreGhkR2wwZFdSbFhDSTZiblZzYkN4Y0lreHZibWRwZEhWa1pWd2lPbTUxYkd3c1hDSk1iMk5oZEdsdmJsd2lPbTUxYkd3c1hDSjBhVzFsZW05dVpWd2lPbTUxYkd3c1hDSkRiM1Z1ZEZ3aU9tNTFiR3dzWENKQmNtVmhRMjlrWlZ3aU9tNTFiR3dzWENKT1pYUjNiM0pyVUhKdmRtbGtaWEpjSWpwdWRXeHNmU0lzSW5kd1l5STZJbnRjSWtGalkxUjVjR1ZjSWpwY0lqVXVNRndpTEZ3aVRtOTBhV1pwWTJGMGFXOXVVSEp2ZG1sa1pYSmNJanBjSWxZeFNGUlVVRndpTEZ3aVJtTnRVMlZ1WkdWeVNXUmNJanBjSWx3aUxGd2lSbU50VTJWeWRtVnlTMlY1WENJNlhDSmNJaXhjSWtGd2FVdGxlVndpT2x3aVUwUlRYQ0lzWENKQmRYUm9SRzl0WVdsdVhDSTZYQ0pUUkZOY0lpeGNJa1JoZEdGaVlYTmxWWEpzWENJNlhDSlRSRk5jSWl4Y0lsQnliMnBsWTNSSlJGd2lPbHdpVTBSVFhDSXNYQ0pUZEc5eVlXZGxRblZqYTJWMFhDSTZYQ0pUUkZOY0lpeGNJazFsYzNOaFoybHVaMU5sYm1SbGNrbEVYQ0k2WENKVFJGTmNJaXhjSWtGd2NFbEVYQ0k2WENKVFJGTmNJaXhjSWxaaGNFbEVYQ0k2WENKVFJGTmNJaXhjSWsxbFlYTjFjbVZ0Wlc1MFNXUmNJanB1ZFd4c0xGd2lVMlJyUlc1a1VHOXBiblJjSWp...</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call7" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://wiz.resul.io/AccountSetup/GetLicenseRenewalStatus</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">2946 ms</span></div><div class="perf-call-body" id="perf1-call7-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call7-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call7-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;wiz.resul.io&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/AccountSetup/GetLicenseRenewalStatus&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;application/json, text/plain, */*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;authorization&quot;: &quot;Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJRQSB0ZXN0b25lIiwianRpIjoiNzlhNzA0YTMtZWY1NC00NmExLWIzNmQtZTM3NjlmYjNlNTg5Iiwic2NvcGUiOiJyZWFkIiwiaHR0cDovL3NjaGVtYXMubWljcm9zb2Z0LmNvbS93cy8yMDA4LzA2L2lkZW50aXR5L2NsYWltcy9yb2xlIjoiQWRtaW4iLCJleHAiOjE3ODcxNTY5NzQsImlzcyI6Ik15QXV0aFNlcnZlciIsImF1ZCI6IlJFU1VMIn0.Zdvstn2NI6CKVqcNbiwm0eyovBC3MT7tdYiCnn4Y9FE&quot;,
+  &quot;content-length&quot;: &quot;17&quot;,
+  &quot;content-type&quot;: &quot;application/json&quot;,
+  &quot;origin&quot;: &quot;https://reacuix.resul.io&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://reacuix.resul.io/&quot;,
+  &quot;reqs&quot;: &quot;BFcChAk9r1WCipIYERaCIQ56OGExbd4FlXJw7sDeIoM=&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;,
+  &quot;x-forwarded-for&quot;: &quot;27bf302e-7576-44a7-9e07-62e347d4a81c&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call7-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call7-reqpayload-content" style="display:none;">{
+  &quot;clientId&quot;: 6200
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call7-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call7-response-content" style="display:none;">{
+  &quot;access-control-allow-credentials&quot;: &quot;true&quot;,
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;alt-svc&quot;: &quot;h3=\&quot;:443\&quot;; ma=86400&quot;,
+  &quot;cf-cache-status&quot;: &quot;DYNAMIC&quot;,
+  &quot;cf-ray&quot;: &quot;a2da31ea3a9f7f22-MAA&quot;,
+  &quot;content-encoding&quot;: &quot;br&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=utf-8&quot;,
+  &quot;date&quot;: &quot;Wed, 19 Aug 2026 15:29:41 GMT&quot;,
+  &quot;origin_request_header&quot;: &quot;*&quot;,
+  &quot;server&quot;: &quot;cloudflare&quot;,
+  &quot;strict-transport-security&quot;: &quot;max-age=15552000; includeSubDomains; preload&quot;,
+  &quot;vary&quot;: &quot;Accept-Encoding, Origin&quot;,
+  &quot;via&quot;: &quot;1.1 google&quot;,
+  &quot;x-content-type-options&quot;: &quot;nosniff&quot;,
+  &quot;x-frame-options&quot;: &quot;SAMEORIGIN&quot;,
+  &quot;x-xss-protection&quot;: &quot;1; mode=block&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call7-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call7-resppayload-content" style="display:none;">{
+  &quot;status&quot;: false,
+  &quot;message&quot;: &quot;No data available.&quot;,
+  &quot;data&quot;: {}
+}</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call8" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://wiz.resul.io/Audience/GetUtcTimeJson</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">1461 ms</span></div><div class="perf-call-body" id="perf1-call8-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call8-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call8-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;wiz.resul.io&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/Audience/GetUtcTimeJson&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;application/json, text/plain, */*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;authorization&quot;: &quot;Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJRQSB0ZXN0b25lIiwianRpIjoiNzlhNzA0YTMtZWY1NC00NmExLWIzNmQtZTM3NjlmYjNlNTg5Iiwic2NvcGUiOiJyZWFkIiwiaHR0cDovL3NjaGVtYXMubWljcm9zb2Z0LmNvbS93cy8yMDA4LzA2L2lkZW50aXR5L2NsYWltcy9yb2xlIjoiQWRtaW4iLCJleHAiOjE3ODcxNTY5NzQsImlzcyI6Ik15QXV0aFNlcnZlciIsImF1ZCI6IlJFU1VMIn0.Zdvstn2NI6CKVqcNbiwm0eyovBC3MT7tdYiCnn4Y9FE&quot;,
+  &quot;content-length&quot;: &quot;2&quot;,
+  &quot;content-type&quot;: &quot;application/json&quot;,
+  &quot;origin&quot;: &quot;https://reacuix.resul.io&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://reacuix.resul.io/&quot;,
+  &quot;reqs&quot;: &quot;BFcChAk9r1WCipIYERaCIQ56OGExbd4FlXJw7sDeIoM=&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;,
+  &quot;x-forwarded-for&quot;: &quot;27bf302e-7576-44a7-9e07-62e347d4a81c&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call8-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call8-reqpayload-content" style="display:none;">{}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call8-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call8-response-content" style="display:none;">{
+  &quot;access-control-allow-credentials&quot;: &quot;true&quot;,
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;alt-svc&quot;: &quot;h3=\&quot;:443\&quot;; ma=86400&quot;,
+  &quot;cf-cache-status&quot;: &quot;DYNAMIC&quot;,
+  &quot;cf-ray&quot;: &quot;a2da31f4c8097f22-MAA&quot;,
+  &quot;content-encoding&quot;: &quot;br&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=utf-8&quot;,
+  &quot;date&quot;: &quot;Wed, 19 Aug 2026 15:29:41 GMT&quot;,
+  &quot;origin_request_header&quot;: &quot;*&quot;,
+  &quot;server&quot;: &quot;cloudflare&quot;,
+  &quot;strict-transport-security&quot;: &quot;max-age=15552000; includeSubDomains; preload&quot;,
+  &quot;vary&quot;: &quot;Accept-Encoding, Origin&quot;,
+  &quot;via&quot;: &quot;1.1 google&quot;,
+  &quot;x-content-type-options&quot;: &quot;nosniff&quot;,
+  &quot;x-frame-options&quot;: &quot;SAMEORIGIN&quot;,
+  &quot;x-xss-protection&quot;: &quot;1; mode=block&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call8-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call8-resppayload-content" style="display:none;">{
+  &quot;utcTime&quot;: &quot;2026-08-19T15:29:41.0143185Z&quot;,
+  &quot;userAgent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call9" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://wiz.resul.io/Dashboard/GetDashboard</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">3006 ms</span></div><div class="perf-call-body" id="perf1-call9-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call9-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call9-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;wiz.resul.io&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/Dashboard/GetDashboard&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;application/json, text/plain, */*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;authorization&quot;: &quot;Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJRQSB0ZXN0b25lIiwianRpIjoiNzlhNzA0YTMtZWY1NC00NmExLWIzNmQtZTM3NjlmYjNlNTg5Iiwic2NvcGUiOiJyZWFkIiwiaHR0cDovL3NjaGVtYXMubWljcm9zb2Z0LmNvbS93cy8yMDA4LzA2L2lkZW50aXR5L2NsYWltcy9yb2xlIjoiQWRtaW4iLCJleHAiOjE3ODcxNTY5NzQsImlzcyI6Ik15QXV0aFNlcnZlciIsImF1ZCI6IlJFU1VMIn0.Zdvstn2NI6CKVqcNbiwm0eyovBC3MT7tdYiCnn4Y9FE&quot;,
+  &quot;content-length&quot;: &quot;62&quot;,
+  &quot;content-type&quot;: &quot;application/json&quot;,
+  &quot;origin&quot;: &quot;https://reacuix.resul.io&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://reacuix.resul.io/&quot;,
+  &quot;reqs&quot;: &quot;BFcChAk9r1WCipIYERaCIQ56OGExbd4FlXJw7sDeIoM=&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;,
+  &quot;x-forwarded-for&quot;: &quot;27bf302e-7576-44a7-9e07-62e347d4a81c&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call9-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call9-reqpayload-content" style="display:none;">{
+  &quot;duration&quot;: 30,
+  &quot;clientID&quot;: 6201,
+  &quot;userId&quot;: 9383,
+  &quot;departmentID&quot;: 3
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call9-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call9-response-content" style="display:none;">{
+  &quot;access-control-allow-credentials&quot;: &quot;true&quot;,
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;alt-svc&quot;: &quot;h3=\&quot;:443\&quot;; ma=86400&quot;,
+  &quot;cf-cache-status&quot;: &quot;DYNAMIC&quot;,
+  &quot;cf-ray&quot;: &quot;a2da31f1ac1d7f22-MAA&quot;,
+  &quot;content-encoding&quot;: &quot;br&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=utf-8&quot;,
+  &quot;date&quot;: &quot;Wed, 19 Aug 2026 15:29:42 GMT&quot;,
+  &quot;origin_request_header&quot;: &quot;*&quot;,
+  &quot;server&quot;: &quot;cloudflare&quot;,
+  &quot;strict-transport-security&quot;: &quot;max-age=15552000; includeSubDomains; preload&quot;,
+  &quot;vary&quot;: &quot;Accept-Encoding, Origin&quot;,
+  &quot;via&quot;: &quot;1.1 google&quot;,
+  &quot;x-content-type-options&quot;: &quot;nosniff&quot;,
+  &quot;x-frame-options&quot;: &quot;SAMEORIGIN&quot;,
+  &quot;x-xss-protection&quot;: &quot;1; mode=block&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call9-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call9-resppayload-content" style="display:none;">{
+  &quot;status&quot;: false,
+  &quot;message&quot;: &quot;Data not available&quot;,
+  &quot;data&quot;: &quot;&quot;
+}</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call10" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://wiz.resul.io/Audience/GetUniqueAttributeValuesFromResEngine</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">3121 ms</span></div><div class="perf-call-body" id="perf1-call10-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call10-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call10-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;wiz.resul.io&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/Audience/GetUniqueAttributeValuesFromResEngine&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;application/json, text/plain, */*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;authorization&quot;: &quot;Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJRQSB0ZXN0b25lIiwianRpIjoiNzlhNzA0YTMtZWY1NC00NmExLWIzNmQtZTM3NjlmYjNlNTg5Iiwic2NvcGUiOiJyZWFkIiwiaHR0cDovL3NjaGVtYXMubWljcm9zb2Z0LmNvbS93cy8yMDA4LzA2L2lkZW50aXR5L2NsYWltcy9yb2xlIjoiQWRtaW4iLCJleHAiOjE3ODcxNTY5NzQsImlzcyI6Ik15QXV0aFNlcnZlciIsImF1ZCI6IlJFU1VMIn0.Zdvstn2NI6CKVqcNbiwm0eyovBC3MT7tdYiCnn4Y9FE&quot;,
+  &quot;content-length&quot;: &quot;114&quot;,
+  &quot;content-type&quot;: &quot;application/json&quot;,
+  &quot;origin&quot;: &quot;https://reacuix.resul.io&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://reacuix.resul.io/&quot;,
+  &quot;reqs&quot;: &quot;BFcChAk9r1WCipIYERaCIQ56OGExbd4FlXJw7sDeIoM=&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;,
+  &quot;x-forwarded-for&quot;: &quot;27bf302e-7576-44a7-9e07-62e347d4a81c&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call10-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call10-reqpayload-content" style="display:none;">{
+  &quot;clientId&quot;: 6201,
+  &quot;userId&quot;: 9383,
+  &quot;departmentId&quot;: 3,
+  &quot;partnerID&quot;: 0,
+  &quot;Isdashboardflage&quot;: true,
+  &quot;attributeName&quot;: &quot;Segment_s&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call10-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call10-response-content" style="display:none;">{
+  &quot;access-control-allow-credentials&quot;: &quot;true&quot;,
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;alt-svc&quot;: &quot;h3=\&quot;:443\&quot;; ma=86400&quot;,
+  &quot;cf-cache-status&quot;: &quot;DYNAMIC&quot;,
+  &quot;cf-ray&quot;: &quot;a2da31f19c147f22-MAA&quot;,
+  &quot;content-encoding&quot;: &quot;br&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=utf-8&quot;,
+  &quot;date&quot;: &quot;Wed, 19 Aug 2026 15:29:42 GMT&quot;,
+  &quot;origin_request_header&quot;: &quot;*&quot;,
+  &quot;server&quot;: &quot;cloudflare&quot;,
+  &quot;strict-transport-security&quot;: &quot;max-age=15552000; includeSubDomains; preload&quot;,
+  &quot;vary&quot;: &quot;Accept-Encoding, Origin&quot;,
+  &quot;via&quot;: &quot;1.1 google&quot;,
+  &quot;x-content-type-options&quot;: &quot;nosniff&quot;,
+  &quot;x-frame-options&quot;: &quot;SAMEORIGIN&quot;,
+  &quot;x-xss-protection&quot;: &quot;1; mode=block&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call10-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call10-resppayload-content" style="display:none;">{
+  &quot;status&quot;: false,
+  &quot;message&quot;: &quot;Fail&quot;,
+  &quot;data&quot;: null
+}</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call11" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://wiz.resul.io/AlertAndNotifications/GetUnreadCount</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">3006 ms</span></div><div class="perf-call-body" id="perf1-call11-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call11-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call11-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;wiz.resul.io&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/AlertAndNotifications/GetUnreadCount&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;application/json, text/plain, */*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;authorization&quot;: &quot;Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJRQSB0ZXN0b25lIiwianRpIjoiNzlhNzA0YTMtZWY1NC00NmExLWIzNmQtZTM3NjlmYjNlNTg5Iiwic2NvcGUiOiJyZWFkIiwiaHR0cDovL3NjaGVtYXMubWljcm9zb2Z0LmNvbS93cy8yMDA4LzA2L2lkZW50aXR5L2NsYWltcy9yb2xlIjoiQWRtaW4iLCJleHAiOjE3ODcxNTY5NzQsImlzcyI6Ik15QXV0aFNlcnZlciIsImF1ZCI6IlJFU1VMIn0.Zdvstn2NI6CKVqcNbiwm0eyovBC3MT7tdYiCnn4Y9FE&quot;,
+  &quot;content-length&quot;: &quot;48&quot;,
+  &quot;content-type&quot;: &quot;application/json&quot;,
+  &quot;origin&quot;: &quot;https://reacuix.resul.io&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://reacuix.resul.io/&quot;,
+  &quot;reqs&quot;: &quot;BFcChAk9r1WCipIYERaCIQ56OGExbd4FlXJw7sDeIoM=&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;,
+  &quot;x-forwarded-for&quot;: &quot;27bf302e-7576-44a7-9e07-62e347d4a81c&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call11-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call11-reqpayload-content" style="display:none;">{
+  &quot;departmentId&quot;: 3,
+  &quot;clientId&quot;: 6201,
+  &quot;userId&quot;: 9383
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call11-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call11-response-content" style="display:none;">{
+  &quot;access-control-allow-credentials&quot;: &quot;true&quot;,
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;alt-svc&quot;: &quot;h3=\&quot;:443\&quot;; ma=86400&quot;,
+  &quot;cf-cache-status&quot;: &quot;DYNAMIC&quot;,
+  &quot;cf-ray&quot;: &quot;a2da31f40f257f22-MAA&quot;,
+  &quot;content-encoding&quot;: &quot;br&quot;,
+  &quot;content-type&quot;: &quot;text/plain; charset=utf-8&quot;,
+  &quot;date&quot;: &quot;Wed, 19 Aug 2026 15:29:42 GMT&quot;,
+  &quot;origin_request_header&quot;: &quot;*&quot;,
+  &quot;server&quot;: &quot;cloudflare&quot;,
+  &quot;strict-transport-security&quot;: &quot;max-age=15552000; includeSubDomains; preload&quot;,
+  &quot;vary&quot;: &quot;Accept-Encoding, Origin&quot;,
+  &quot;via&quot;: &quot;1.1 google&quot;,
+  &quot;x-content-type-options&quot;: &quot;nosniff&quot;,
+  &quot;x-frame-options&quot;: &quot;SAMEORIGIN&quot;,
+  &quot;x-xss-protection&quot;: &quot;1; mode=block&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call11-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call11-resppayload-content" style="display:none;">{
+  &quot;status&quot;: true,
+  &quot;message&quot;: &quot;Overall Count&quot;,
+  &quot;data&quot;: 21,
+  &quot;alertId&quot;: 0
+}</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call12" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://sdk.resul.io/Campaign/GetLastVisitnew</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">1185 ms</span></div><div class="perf-call-body" id="perf1-call12-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call12-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call12-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;sdk.resul.io&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/Campaign/GetLastVisitnew&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;*/*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;content-length&quot;: &quot;41&quot;,
+  &quot;content-type&quot;: &quot;text/plain;charset=UTF-8&quot;,
+  &quot;isencryption&quot;: &quot;true&quot;,
+  &quot;origin&quot;: &quot;https://reacuix.resul.io&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://reacuix.resul.io/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call12-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call12-reqpayload-content" style="display:none;">hn$eyJpZCI6Im5KMl9FX1BfN0EwMDREOTAifQ==@h</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call12-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call12-response-content" style="display:none;">{
+  &quot;access-control-allow-credentials&quot;: &quot;true&quot;,
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;alt-svc&quot;: &quot;h3=\&quot;:443\&quot;; ma=86400&quot;,
+  &quot;cache-control&quot;: &quot;no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0&quot;,
+  &quot;cf-cache-status&quot;: &quot;DYNAMIC&quot;,
+  &quot;cf-ray&quot;: &quot;a2da32082cdca27c-MAA&quot;,
+  &quot;content-encoding&quot;: &quot;br&quot;,
+  &quot;content-security-policy&quot;: &quot;frame-ancestors &#39;self&#39; *.resul.io *.resu.io&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=utf-8&quot;,
+  &quot;date&quot;: &quot;Wed, 19 Aug 2026 15:29:44 GMT&quot;,
+  &quot;pragma&quot;: &quot;no-cache&quot;,
+  &quot;server&quot;: &quot;cloudflare&quot;,
+  &quot;strict-transport-security&quot;: &quot;max-age=31536000; includeSubDomains&quot;,
+  &quot;vary&quot;: &quot;Origin, Accept-Encoding&quot;,
+  &quot;via&quot;: &quot;1.1 google&quot;,
+  &quot;x-content-type-options&quot;: &quot;nosniff&quot;,
+  &quot;x-frame-options&quot;: &quot;ALLOW-FROM https://*.resul.io https://sdk.resul.io&quot;,
+  &quot;x-xss-protection&quot;: &quot;1; mode=block&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call12-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call12-resppayload-content" style="display:none;">{
+  &quot;status&quot;: false,
+  &quot;message&quot;: &quot;File not Found&quot;,
+  &quot;data&quot;: &quot;hW0eyJzdGF0dXMiOmZhbHNlLCJtZXNzYWdlIjoiRmlsZSBub3QgRm91bmQifQ==mM&quot;
+}</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call13" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://sdk.resul.io/Campaign/UserJourneybulk</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 201</span><span class="perf-call-time">1218 ms</span></div><div class="perf-call-body" id="perf1-call13-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call13-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call13-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;sdk.resul.io&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/Campaign/UserJourneybulk&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;*/*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;content-length&quot;: &quot;2765&quot;,
+  &quot;content-type&quot;: &quot;text/plain;charset=UTF-8&quot;,
+  &quot;isencryption&quot;: &quot;true&quot;,
+  &quot;origin&quot;: &quot;https://reacuix.resul.io&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://reacuix.resul.io/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call13-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call13-reqpayload-content" style="display:none;">$$eeyJwcm9maWxlSWQiOiJQXzdBMDA0RDkwIiwicGFzc3BvcnRJZCI6IlBfN0EwMDREOTAiLCJ0ZW5hbnRJZCI6ImQyNGY5ZGQzX2NjYzdfNDE2Nl84MDE2XzRjMmI2NDcwZTYxNSIsImRvbWFpbk5hbWUiOiJyZWFjdWl4LnJlc3VsLmlvIiwiZGV2aWNlSWQiOiJENDRCOTBBMyIsImRldmljZUZpbmdlclByaW50IjoiRDQ0QjkwQTMiLCJwYWdlVXJsIjoiaHR0cHM6Ly9yZWFjdWl4LnJlc3VsLmlvL2Rhc2hib2FyZD9xPVUyRnNkR1ZrWDE5bjI2ektlTm9NVUxZbVQyQURzTnNyTTRWZXlCdFgwcmslM0QiLCJkdXJhdGlvbiI6MSwiY2FtcGFpZ25JZCI6IiIsImNoYW5uZWxJZCI6IiIsImRldmljZUlwIjpudWxsLCJicm93c2VyTmFtZSI6IkNocm9tZSIsImJyb3dzZXJWZXJzaW9uIjoxNDcsImRldmljZVRpbWVab25lIjoiQXNpYS9DYWxjdXR0YSIsImRldmljZVR5cGUiOiJEZXNrdG9wL0xhcHRvcCIsImlzUHVzaEVuYWJsZWQiOiJmYWxzZSIsIlVzZXJEdXJhdGlvbiI6MSwiaXNCbHVldG9vdGhFbmFibGVkIjpmYWxzZSwiaXNOb3RpZmljYXRpb24iOmZhbHNlLCJpc1dpZmlFbmFibGVkIjpmYWxzZSwibkZDRW5hYmxlZCI6IiIsImxvY2F0aW9uQWNjdXJhY3lUeXBlIjpmYWxzZSwibmV0d29ya1R5cGUiOiIzZyIsImxhbmd1YWdlIjoiZW4tVVMiLCJsb2NhdGlvbiI6bnVsbCwidGltZXpvbmUiOiJBc2lhL0NhbGN1dHRhIiwibmV0d29ya1Byb3ZpZGVyIjpudWxsLCJjdXJyZW5jeSI6bnVsbCwiY2FtcGFpZ25VcmwiOiIiLCJ2aXNpdG9yQ291bnQiOjEsInNjcmVlbnMiOltdLCJkZXZpY2VBdHRyaWJ1dGUiOnsiZGV2aWNlSWQiOiJENDRCOTBBMyIsImRvbWFpbk5hbWUiOiJyZWFjdWl4LnJlc3VsLmlvIiwidENvZGUiOiJuSjIiLCJkZXZpY2VUeXBlIjoiRGVza3RvcC9MYXB0b3AiLCJkZXZpY2VNb2RlbCI6IiIsIm1hbnVmYWN0dXJlIjoiIiwibGFuZ3VhZ2UiOiJlbi1VUyIsInRpbWV6b25lIjoiQXNpYS9DYWxjdXR0YSIsInNjcmVlblJlc29sdXRpb24iOiIxMjgweDcyMCIsIm9zVHlwZSI6IldpbmRvd3MiLCJ2ZXJzaW9uIjoiMTAiLCJpcEFkZHJlc3MiOm51bGwsImlzTm90aWZpY2F0aW9uRW5hYmxlZCI6ImZhbHNlIiwiYkNvZGUiOiIiLCJkaWQiOiIiLCJwYXNzcG9ydElkIjoiUF...</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call13-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call13-response-content" style="display:none;">{
+  &quot;access-control-allow-credentials&quot;: &quot;true&quot;,
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;alt-svc&quot;: &quot;h3=\&quot;:443\&quot;; ma=86400&quot;,
+  &quot;cache-control&quot;: &quot;no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0&quot;,
+  &quot;cf-cache-status&quot;: &quot;DYNAMIC&quot;,
+  &quot;cf-ray&quot;: &quot;a2da32086daca27c-MAA&quot;,
+  &quot;content-encoding&quot;: &quot;br&quot;,
+  &quot;content-security-policy&quot;: &quot;frame-ancestors &#39;self&#39; *.resul.io *.resu.io&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=utf-8&quot;,
+  &quot;date&quot;: &quot;Wed, 19 Aug 2026 15:29:44 GMT&quot;,
+  &quot;pragma&quot;: &quot;no-cache&quot;,
+  &quot;server&quot;: &quot;cloudflare&quot;,
+  &quot;strict-transport-security&quot;: &quot;max-age=31536000; includeSubDomains&quot;,
+  &quot;vary&quot;: &quot;Origin, Accept-Encoding&quot;,
+  &quot;via&quot;: &quot;1.1 google&quot;,
+  &quot;x-content-type-options&quot;: &quot;nosniff&quot;,
+  &quot;x-frame-options&quot;: &quot;ALLOW-FROM https://*.resul.io https://sdk.resul.io&quot;,
+  &quot;x-xss-protection&quot;: &quot;1; mode=block&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call13-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call13-resppayload-content" style="display:none;">{
+  &quot;status&quot;: true,
+  &quot;message&quot;: &quot;success&quot;,
+  &quot;data&quot;: &quot;J5WeyJzdGF0dXMiOnRydWUsIm1lc3NhZ2UiOiJzdWNjZXNzIiwic2RrRW5kUG9pbnQiOiJodHRwczovL3Nkay5yZXN1bC5pby8iLCJkZXZpY2VEb21haW5NYXBJRCI6IiJ9z1&quot;
+}</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call14" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://sdk.resul.io/Campaign/GetAudienceCache</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">2169 ms</span></div><div class="perf-call-body" id="perf1-call14-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call14-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call14-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;sdk.resul.io&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/Campaign/GetAudienceCache&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;*/*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;content-length&quot;: &quot;67&quot;,
+  &quot;content-type&quot;: &quot;text/plain;charset=UTF-8&quot;,
+  &quot;isencryption&quot;: &quot;false&quot;,
+  &quot;origin&quot;: &quot;https://reacuix.resul.io&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://reacuix.resul.io/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call14-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call14-reqpayload-content" style="display:none;">{
+  &quot;passportId&quot;: &quot;P_7A004D90&quot;,
+  &quot;domainName&quot;: &quot;https://reacuix.resul.io&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call14-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call14-response-content" style="display:none;">{
+  &quot;access-control-allow-credentials&quot;: &quot;true&quot;,
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;alt-svc&quot;: &quot;h3=\&quot;:443\&quot;; ma=86400&quot;,
+  &quot;cache-control&quot;: &quot;no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0&quot;,
+  &quot;cf-cache-status&quot;: &quot;DYNAMIC&quot;,
+  &quot;cf-ray&quot;: &quot;a2da3207cb7ea27c-MAA&quot;,
+  &quot;content-encoding&quot;: &quot;br&quot;,
+  &quot;content-security-policy&quot;: &quot;frame-ancestors &#39;self&#39; *.resul.io *.resu.io&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=utf-8&quot;,
+  &quot;date&quot;: &quot;Wed, 19 Aug 2026 15:29:45 GMT&quot;,
+  &quot;pragma&quot;: &quot;no-cache&quot;,
+  &quot;server&quot;: &quot;cloudflare&quot;,
+  &quot;strict-transport-security&quot;: &quot;max-age=31536000; includeSubDomains&quot;,
+  &quot;vary&quot;: &quot;Origin, Accept-Encoding&quot;,
+  &quot;via&quot;: &quot;1.1 google&quot;,
+  &quot;x-content-type-options&quot;: &quot;nosniff&quot;,
+  &quot;x-frame-options&quot;: &quot;ALLOW-FROM https://*.resul.io https://sdk.resul.io&quot;,
+  &quot;x-xss-protection&quot;: &quot;1; mode=block&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call14-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call14-resppayload-content" style="display:none;">{
+  &quot;status&quot;: true,
+  &quot;statusCode&quot;: 200,
+  &quot;data&quot;: null
+}</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call15" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://sdk.resul.io/Campaign/DeviceRegister</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 201</span><span class="perf-call-time">1188 ms</span></div><div class="perf-call-body" id="perf1-call15-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call15-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call15-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;sdk.resul.io&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/Campaign/DeviceRegister&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;*/*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;content-length&quot;: &quot;1005&quot;,
+  &quot;content-type&quot;: &quot;text/plain;charset=UTF-8&quot;,
+  &quot;isencryption&quot;: &quot;true&quot;,
+  &quot;origin&quot;: &quot;https://reacuix.resul.io&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://reacuix.resul.io/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call15-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call15-reqpayload-content" style="display:none;">$keeyJwcm9maWxlSUQiOiJQXzdBMDA0RDkwIiwicGFzc3BvcnRJZCI6IlBfN0EwMDREOTAiLCJ0ZW5hbnRJZCI6ImQyNGY5ZGQzX2NjYzdfNDE2Nl84MDE2XzRjMmI2NDcwZTYxNSIsImRvbWFpbk5hbWUiOiJyZWFjdWl4LnJlc3VsLmlvIiwiaXNQdXNoRW5hYmxlZCI6ImZhbHNlIiwiZGV2aWNlSWQiOiJENDRCOTBBMyIsInRlbmFudFNob3J0Q29kZSI6Im5KMiIsInVuaXF1ZUlkIjoiIiwicmlkIjoiIiwiY2lkIjoiIiwiZGV2aWNlT3MiOiJXaW5kb3dzIiwiZGV2aWNlVHlwZSI6IkRlc2t0b3AvTGFwdG9wIiwiZGV2aWNlQnJvd3Nlck5hbWUiOiJDaHJvbWUiLCJkZXZpY2VCcm93c2VyVmVyc2lvbiI6MTQ3LCJkZXZpY2VJcCI6bnVsbCwiZGV2aWNlTGFuZ3VhZ2UiOiJlbi1VUyIsImFkdmVydGlzaW5nSUQiOiIiLCJjb3VudHJ5IjpudWxsLCJuZXR3b3JrUHJvdmlkZXIiOm51bGwsImN1cnJlbmN5IjpudWxsLCJyZWdpb24iOm51bGwsImxvY2F0aW9uIjpudWxsLCJ3aWZpIjpmYWxzZSwiY3B1X3R5cGUiOmZhbHNlLCJwaG9uZVJhZGlvVHlwZSI6ZmFsc2UsImlzQmx1ZXRvb3RoRW5hYmxlZCI6ZmFsc2UsImlzV2lmaUVuYWJsZWQiOmZhbHNlLCJibHVldG9vdGhWZXJzaW9uIjpmYWxzZSwibG9jYXRpb25BY2N1cmFjeVR5cGUiOmZhbHNlLCJkZXZpY2VUaW1lWm9uZSI6IkFzaWEvQ2FsY3V0dGEiLCJuZXR3b3JrVHlwZSI6IjNnIiwiZGV2aWNlT3NWZXJzaW9uIjoiMTAiLCJzY3JlZW5yZXNvbHV0aW9uIjoiMTI4MFg3MjAifQ==h$</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call15-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call15-response-content" style="display:none;">{
+  &quot;access-control-allow-credentials&quot;: &quot;true&quot;,
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;alt-svc&quot;: &quot;h3=\&quot;:443\&quot;; ma=86400&quot;,
+  &quot;cache-control&quot;: &quot;no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0&quot;,
+  &quot;cf-cache-status&quot;: &quot;DYNAMIC&quot;,
+  &quot;cf-ray&quot;: &quot;a2da32116feea27c-MAA&quot;,
+  &quot;content-encoding&quot;: &quot;br&quot;,
+  &quot;content-security-policy&quot;: &quot;frame-ancestors &#39;self&#39; *.resul.io *.resu.io&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=utf-8&quot;,
+  &quot;date&quot;: &quot;Wed, 19 Aug 2026 15:29:45 GMT&quot;,
+  &quot;pragma&quot;: &quot;no-cache&quot;,
+  &quot;server&quot;: &quot;cloudflare&quot;,
+  &quot;strict-transport-security&quot;: &quot;max-age=31536000; includeSubDomains&quot;,
+  &quot;vary&quot;: &quot;Origin, Accept-Encoding&quot;,
+  &quot;via&quot;: &quot;1.1 google&quot;,
+  &quot;x-content-type-options&quot;: &quot;nosniff&quot;,
+  &quot;x-frame-options&quot;: &quot;ALLOW-FROM https://*.resul.io https://sdk.resul.io&quot;,
+  &quot;x-xss-protection&quot;: &quot;1; mode=block&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call15-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call15-resppayload-content" style="display:none;">{
+  &quot;status&quot;: true,
+  &quot;message&quot;: &quot;success&quot;,
+  &quot;data&quot;: &quot;mgheyJzdGF0dXMiOnRydWUsIm1lc3NhZ2UiOiJzdWNjZXNzIn0=oU&quot;
+}</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call16" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://sdk.resul.io/Campaign/getsdkrules</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 201</span><span class="perf-call-time">1883 ms</span></div><div class="perf-call-body" id="perf1-call16-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call16-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call16-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;sdk.resul.io&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/Campaign/getsdkrules&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;*/*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;content-length&quot;: &quot;133&quot;,
+  &quot;content-type&quot;: &quot;text/plain;charset=UTF-8&quot;,
+  &quot;isencryption&quot;: &quot;true&quot;,
+  &quot;origin&quot;: &quot;https://reacuix.resul.io&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://reacuix.resul.io/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call16-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call16-reqpayload-content" style="display:none;">$@eeyJhcHBpZCI6IiIsInRlbmFudGlkIjoiZDI0ZjlkZDNfY2NjN180MTY2XzgwMTZfNGMyYjY0NzBlNjE1IiwiZG9tYWlubmFtZSI6InJlYWN1aXgucmVzdWwuaW8ifQ==$k</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call16-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call16-response-content" style="display:none;">{
+  &quot;access-control-allow-credentials&quot;: &quot;true&quot;,
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;alt-svc&quot;: &quot;h3=\&quot;:443\&quot;; ma=86400&quot;,
+  &quot;cache-control&quot;: &quot;no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0&quot;,
+  &quot;cf-cache-status&quot;: &quot;DYNAMIC&quot;,
+  &quot;cf-ray&quot;: &quot;a2da320f98cea27c-MAA&quot;,
+  &quot;content-encoding&quot;: &quot;br&quot;,
+  &quot;content-security-policy&quot;: &quot;frame-ancestors &#39;self&#39; *.resul.io *.resu.io&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=utf-8&quot;,
+  &quot;date&quot;: &quot;Wed, 19 Aug 2026 15:29:46 GMT&quot;,
+  &quot;pragma&quot;: &quot;no-cache&quot;,
+  &quot;server&quot;: &quot;cloudflare&quot;,
+  &quot;strict-transport-security&quot;: &quot;max-age=31536000; includeSubDomains&quot;,
+  &quot;vary&quot;: &quot;Origin, Accept-Encoding&quot;,
+  &quot;via&quot;: &quot;1.1 google&quot;,
+  &quot;x-content-type-options&quot;: &quot;nosniff&quot;,
+  &quot;x-frame-options&quot;: &quot;ALLOW-FROM https://*.resul.io https://sdk.resul.io&quot;,
+  &quot;x-xss-protection&quot;: &quot;1; mode=block&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call16-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call16-resppayload-content" style="display:none;">{
+  &quot;status&quot;: true,
+  &quot;message&quot;: &quot;success&quot;,
+  &quot;data&quot;: &quot;XY5eyJzdGF0dXMiOnRydWUsIm1lc3NhZ2UiOiJzdWNjZXNzIiwidGVuYW50SUQiOiJjdXN0X2QyNGY5ZGQzX2NjYzdfNDE2Nl84MDE2XzRjMmI2NDcwZTYxNSIsImR5bmFtaWNsaXN0IjpbXX0=Q2&quot;
+}</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call17" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://sdk.resul.io/Campaign/SetLastVisitnew</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 201</span><span class="perf-call-time">2564 ms</span></div><div class="perf-call-body" id="perf1-call17-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call17-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call17-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;sdk.resul.io&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/Campaign/SetLastVisitnew&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;*/*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;content-length&quot;: &quot;3893&quot;,
+  &quot;content-type&quot;: &quot;text/plain;charset=UTF-8&quot;,
+  &quot;isencryption&quot;: &quot;true&quot;,
+  &quot;origin&quot;: &quot;https://reacuix.resul.io&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://reacuix.resul.io/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call17-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call17-reqpayload-content" style="display:none;">nh$eyJpZCI6Im5KMl9FX1BfN0EwMDREOTAiLCJzb3VyY2UiOiJ3ZWIiLCJzY3JlZW5OYW1lIjoiL2Rhc2hib2FyZCIsInVybCI6Imh0dHBzOi8vcmVhY3VpeC5yZXN1bC5pby9kYXNoYm9hcmQ/cT1VMkZzZEdWa1gxOW4yNnpLZU5vTVVMWW1UMkFEc05zck00VmV5QnRYMHJrJTNEIiwid2ViIjp7ImRldmljZUlkIjoiRDQ0QjkwQTMiLCJkb21haW5OYW1lIjoicmVhY3VpeC5yZXN1bC5pbyIsInRDb2RlIjoibkoyIiwiZGV2aWNlVHlwZSI6IkRlc2t0b3AvTGFwdG9wIiwiZGV2aWNlTW9kZWwiOiIiLCJtYW51ZmFjdHVyZSI6IiIsImxhbmd1YWdlIjoiZW4tVVMiLCJ0aW1lem9uZSI6IkFzaWEvQ2FsY3V0dGEiLCJzY3JlZW5SZXNvbHV0aW9uIjoiMTI4MHg3MjAiLCJ2ZXJzaW9uIjoiMTAiLCJpc05vdGlmaWNhdGlvbkVuYWJsZWQiOiJmYWxzZSIsImJDb2RlIjoiIiwiZGlkIjoiIiwicGFzc3BvcnRJZCI6IlBfN0EwMDREOTAiLCJ2aXNpdG9yc1R5cGUiOiJOZXcgdmlzaXRvciIsInVzZXJUeXBlIjoia25vd24iLCJzZXNzaW9uSWQiOiI0ODYwZTU5Mi04YjNlLTQ5YTEtYTRhYi02YjNkZWM5YjBmNzkiLCJicm93c2VyIjoiQ2hyb21lIiwiYnJvd3NlclZlcnNpb24iOjE0NywiZGV2aWNlT3MiOiJXaW5kb3dzIiwibG9jYXRpb24iOnsiQ291bnRyeSI6bnVsbCwiQ291bnRyeUNvZGUiOm51bGwsIlJlZ2lvbiI6bnVsbCwiQ2l0eSI6bnVsbCwiUG9zdGFsQ29kZSI6bnVsbCwiU3RhdGUiOm51bGwsIkxhdGl0dWRlIjpudWxsLCJMb25naXR1ZGUiOm51bGwsIkxvY2F0aW9uIjpudWxsLCJ0aW1lem9uZSI6bnVsbCwiQ291bnQiOm51bGwsIkFyZWFDb2RlIjpudWxsLCJOZXR3b3JrUHJvdmlkZXIiOm51bGx9LCJjaXR5IjoiIiwic3RhdGUiOiIiLCJjb3VudHJ5IjoiIiwicGFnZURlcHRoIjoiIiwidHJhZmZpY1NvdXJjZSI6ImRpcmVjdCB0cmFmZmljIiwiaXNsb2dpbiI6ZmFsc2UsInBhZ2VJbiI6IjIwMjYtMDgtMTlUMTU6Mjk6NDMiLCJwYWdlT3V0IjoiIiwiY3VzdG9tRXZlbnQiOiIiLCJjdXN0b21FdmVudERhdGEiOiIiLCJjdXN0b21FdmVudERhdGUiOiIiLCJsYXRpdHVkZSI6IiIsImxvbmdpdHVkZSI6IiIsImxhc3RUaW1lU3BlbnQiOiIiLCJsYXN0U2Vzc2lvblRpbWUiOiIiLCJzY3...</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call17-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call17-response-content" style="display:none;">{
+  &quot;access-control-allow-credentials&quot;: &quot;true&quot;,
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;alt-svc&quot;: &quot;h3=\&quot;:443\&quot;; ma=86400&quot;,
+  &quot;cache-control&quot;: &quot;no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0&quot;,
+  &quot;cf-cache-status&quot;: &quot;DYNAMIC&quot;,
+  &quot;cf-ray&quot;: &quot;a2da321c1e27a27c-MAA&quot;,
+  &quot;content-encoding&quot;: &quot;br&quot;,
+  &quot;content-security-policy&quot;: &quot;frame-ancestors &#39;self&#39; *.resul.io *.resu.io&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=utf-8&quot;,
+  &quot;date&quot;: &quot;Wed, 19 Aug 2026 15:29:47 GMT&quot;,
+  &quot;pragma&quot;: &quot;no-cache&quot;,
+  &quot;server&quot;: &quot;cloudflare&quot;,
+  &quot;strict-transport-security&quot;: &quot;max-age=31536000; includeSubDomains&quot;,
+  &quot;vary&quot;: &quot;Origin, Accept-Encoding&quot;,
+  &quot;via&quot;: &quot;1.1 google&quot;,
+  &quot;x-content-type-options&quot;: &quot;nosniff&quot;,
+  &quot;x-frame-options&quot;: &quot;ALLOW-FROM https://*.resul.io https://sdk.resul.io&quot;,
+  &quot;x-xss-protection&quot;: &quot;1; mode=block&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call17-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call17-resppayload-content" style="display:none;">{
+  &quot;status&quot;: true,
+  &quot;message&quot;: &quot;success&quot;,
+  &quot;data&quot;: &quot;cYzeyJzdGF0dXMiOnRydWUsIm1lc3NhZ2UiOiJzdWNjZXNzIn0=0M&quot;
+}</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call18" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://wiz.resul.io/Home/GetKeyPersonInfo</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">1559 ms</span></div><div class="perf-call-body" id="perf1-call18-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call18-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call18-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;wiz.resul.io&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/Home/GetKeyPersonInfo&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;application/json, text/plain, */*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;authorization&quot;: &quot;Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJRQSB0ZXN0b25lIiwianRpIjoiNzlhNzA0YTMtZWY1NC00NmExLWIzNmQtZTM3NjlmYjNlNTg5Iiwic2NvcGUiOiJyZWFkIiwiaHR0cDovL3NjaGVtYXMubWljcm9zb2Z0LmNvbS93cy8yMDA4LzA2L2lkZW50aXR5L2NsYWltcy9yb2xlIjoiQWRtaW4iLCJleHAiOjE3ODcxNTY5NzQsImlzcyI6Ik15QXV0aFNlcnZlciIsImF1ZCI6IlJFU1VMIn0.Zdvstn2NI6CKVqcNbiwm0eyovBC3MT7tdYiCnn4Y9FE&quot;,
+  &quot;content-length&quot;: &quot;48&quot;,
+  &quot;content-type&quot;: &quot;application/json&quot;,
+  &quot;origin&quot;: &quot;https://reacuix.resul.io&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://reacuix.resul.io/&quot;,
+  &quot;reqs&quot;: &quot;BFcChAk9r1WCipIYERaCIQ56OGExbd4FlXJw7sDeIoM=&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;,
+  &quot;x-forwarded-for&quot;: &quot;27bf302e-7576-44a7-9e07-62e347d4a81c&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call18-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call18-reqpayload-content" style="display:none;">{
+  &quot;departmentId&quot;: 3,
+  &quot;clientId&quot;: 6201,
+  &quot;userId&quot;: 9383
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call18-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call18-response-content" style="display:none;">{
+  &quot;access-control-allow-credentials&quot;: &quot;true&quot;,
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;alt-svc&quot;: &quot;h3=\&quot;:443\&quot;; ma=86400&quot;,
+  &quot;cf-cache-status&quot;: &quot;DYNAMIC&quot;,
+  &quot;cf-ray&quot;: &quot;a2da32627b457f22-MAA&quot;,
+  &quot;content-encoding&quot;: &quot;br&quot;,
+  &quot;content-type&quot;: &quot;text/plain; charset=utf-8&quot;,
+  &quot;date&quot;: &quot;Wed, 19 Aug 2026 15:29:59 GMT&quot;,
+  &quot;origin_request_header&quot;: &quot;*&quot;,
+  &quot;server&quot;: &quot;cloudflare&quot;,
+  &quot;strict-transport-security&quot;: &quot;max-age=15552000; includeSubDomains; preload&quot;,
+  &quot;vary&quot;: &quot;Accept-Encoding, Origin&quot;,
+  &quot;via&quot;: &quot;1.1 google&quot;,
+  &quot;x-content-type-options&quot;: &quot;nosniff&quot;,
+  &quot;x-frame-options&quot;: &quot;SAMEORIGIN&quot;,
+  &quot;x-xss-protection&quot;: &quot;1; mode=block&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call18-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call18-resppayload-content" style="display:none;">{
+  &quot;status&quot;: true,
+  &quot;message&quot;: &quot;Success&quot;,
+  &quot;data&quot;: {
+    &quot;keyPersonList&quot;: [
+      {
+        &quot;countrycodeMobile&quot;: &quot;91&quot;,
+        &quot;email&quot;: &quot;qaautomationuser02@info.resul.team&quot;,
+        &quot;isKeyPerson&quot;: true,
+        &quot;phoneNo&quot;: &quot;9150497301&quot;,
+        &quot;name&quot;: &quot;QA testone&quot;,
+        &quot;userID&quot;: 9383,
+        &quot;userTypeID&quot;: 4
+      }
+    ]
+  }
+}</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call19" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://wiz.resul.io/Audience/GetRecommendationJson</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">3000 ms</span></div><div class="perf-call-body" id="perf1-call19-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call19-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call19-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;wiz.resul.io&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/Audience/GetRecommendationJson&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;application/json, text/plain, */*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;authorization&quot;: &quot;Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJRQSB0ZXN0b25lIiwianRpIjoiNzlhNzA0YTMtZWY1NC00NmExLWIzNmQtZTM3NjlmYjNlNTg5Iiwic2NvcGUiOiJyZWFkIiwiaHR0cDovL3NjaGVtYXMubWljcm9zb2Z0LmNvbS93cy8yMDA4LzA2L2lkZW50aXR5L2NsYWltcy9yb2xlIjoiQWRtaW4iLCJleHAiOjE3ODcxNTY5NzQsImlzcyI6Ik15QXV0aFNlcnZlciIsImF1ZCI6IlJFU1VMIn0.Zdvstn2NI6CKVqcNbiwm0eyovBC3MT7tdYiCnn4Y9FE&quot;,
+  &quot;content-length&quot;: &quot;60&quot;,
+  &quot;content-type&quot;: &quot;application/json&quot;,
+  &quot;origin&quot;: &quot;https://reacuix.resul.io&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://reacuix.resul.io/&quot;,
+  &quot;reqs&quot;: &quot;BFcChAk9r1WCipIYERaCIQ56OGExbd4FlXJw7sDeIoM=&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;,
+  &quot;x-forwarded-for&quot;: &quot;27bf302e-7576-44a7-9e07-62e347d4a81c&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call19-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call19-reqpayload-content" style="display:none;">{
+  &quot;departmentId&quot;: 3,
+  &quot;userId&quot;: 9383,
+  &quot;clientId&quot;: 6201,
+  &quot;isBrand&quot;: 1
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call19-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call19-response-content" style="display:none;">{
+  &quot;access-control-allow-credentials&quot;: &quot;true&quot;,
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;alt-svc&quot;: &quot;h3=\&quot;:443\&quot;; ma=86400&quot;,
+  &quot;cf-cache-status&quot;: &quot;DYNAMIC&quot;,
+  &quot;cf-ray&quot;: &quot;a2da325f9f497f22-MAA&quot;,
+  &quot;content-encoding&quot;: &quot;br&quot;,
+  &quot;content-type&quot;: &quot;application/json&quot;,
+  &quot;date&quot;: &quot;Wed, 19 Aug 2026 15:29:59 GMT&quot;,
+  &quot;origin_request_header&quot;: &quot;*&quot;,
+  &quot;server&quot;: &quot;cloudflare&quot;,
+  &quot;strict-transport-security&quot;: &quot;max-age=15552000; includeSubDomains; preload&quot;,
+  &quot;vary&quot;: &quot;Accept-Encoding, Origin&quot;,
+  &quot;via&quot;: &quot;1.1 google&quot;,
+  &quot;x-content-type-options&quot;: &quot;nosniff&quot;,
+  &quot;x-frame-options&quot;: &quot;SAMEORIGIN&quot;,
+  &quot;x-xss-protection&quot;: &quot;1; mode=block&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call19-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call19-resppayload-content" style="display:none;">{&quot;status&quot;:true,&quot;message&quot;:&quot;Data has been fetched successfully&quot;,&quot;data&quot;:{&quot;attributes&quot;:[{&quot;column_name&quot;:&quot;EmailID_s&quot;,&quot;fill_rate&quot;:99.49,&quot;is_priority&quot;:false,&quot;status&quot;:&quot;excellent&quot;},{&quot;column_name&quot;:&quot;MobileNo_s&quot;,&quot;fill_rate&quot;:6.56,&quot;is_priority&quot;:true,&quot;status&quot;:&quot;critical&quot;},{&quot;column_name&quot;:&quot;Channel_s&quot;,&quot;fill_rate&quot;:35.74,&quot;is_priority&quot;:true,&quot;status&quot;:&quot;critical&quot;},{&quot;column_name&quot;:&quot;Age_group_s&quot;,&quot;fill_rate&quot;:0.75,&quot;is_priority&quot;:true,&quot;status&quot;:&quot;critical&quot;},{&quot;column_name&quot;:&quot;Industry_s&quot;,&quot;fill_rate&quot;:0.75,&quot;is_priority&quot;:true,&quot;status&quot;:&quot;critical&quot;},{&quot;column_name&quot;:&quot;State_s&quot;,&quot;fill_rate&quot;:0.0,&quot;is_priority&quot;:true,&quot;status&quot;:&quot;critical&quot;},{&quot;column_name&quot;:&quot;ZipCode_s&quot;,&quot;fill_rate&quot;:0.0,&quot;is_priority&quot;:true,&quot;status&quot;:&quot;critical&quot;}],&quot;business_type&quot;:&quot;b2c&quot;,&quot;business_unit&quot;:&quot;G&quot;,&quot;channels&quot;:[&quot;Email&quot;,&quot;SMS&quot;,&quot;WA&quot;,&quot;Mobile Push&quot;,&quot;In-App&quot;],&quot;industry&quot;:&quot;retail&quot;,&quot;overall_completeness&quot;:20.47,&quot;processing_time_ms&quot;:26930.1,&quot;rationales&quot;:[&quot;Increase customer profile completeness by deploying the Progressive Profiling Journey to 11,303 customers within the Low segment via In-App messaging. This will focus on collecting missing data for key attributes: MobileNo, Channel, and Age group, enabling more effective targeting and personalization.&quot;,&quot;We recommend deploying Behavior-Triggered Form Popup via In-App to 11,303 customers within the Low segment. This campaign will proactively gather missing profile data – specifically Industry, State, and ZipCode – to improve customer understanding and enable more targeted engagement.&quot;,&quot;Initiate Loyalty Program Enrollment via...</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call20" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://wiz.resul.io/Audience/IsPartnerDataEnable</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">3021 ms</span></div><div class="perf-call-body" id="perf1-call20-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call20-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call20-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;wiz.resul.io&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/Audience/IsPartnerDataEnable&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;application/json, text/plain, */*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;authorization&quot;: &quot;Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJRQSB0ZXN0b25lIiwianRpIjoiNzlhNzA0YTMtZWY1NC00NmExLWIzNmQtZTM3NjlmYjNlNTg5Iiwic2NvcGUiOiJyZWFkIiwiaHR0cDovL3NjaGVtYXMubWljcm9zb2Z0LmNvbS93cy8yMDA4LzA2L2lkZW50aXR5L2NsYWltcy9yb2xlIjoiQWRtaW4iLCJleHAiOjE3ODcxNTY5NzQsImlzcyI6Ik15QXV0aFNlcnZlciIsImF1ZCI6IlJFU1VMIn0.Zdvstn2NI6CKVqcNbiwm0eyovBC3MT7tdYiCnn4Y9FE&quot;,
+  &quot;content-length&quot;: &quot;48&quot;,
+  &quot;content-type&quot;: &quot;application/json&quot;,
+  &quot;origin&quot;: &quot;https://reacuix.resul.io&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://reacuix.resul.io/&quot;,
+  &quot;reqs&quot;: &quot;BFcChAk9r1WCipIYERaCIQ56OGExbd4FlXJw7sDeIoM=&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;,
+  &quot;x-forwarded-for&quot;: &quot;27bf302e-7576-44a7-9e07-62e347d4a81c&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call20-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call20-reqpayload-content" style="display:none;">{
+  &quot;departmentId&quot;: 3,
+  &quot;clientId&quot;: 6201,
+  &quot;userId&quot;: 9383
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call20-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call20-response-content" style="display:none;">{
+  &quot;access-control-allow-credentials&quot;: &quot;true&quot;,
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;alt-svc&quot;: &quot;h3=\&quot;:443\&quot;; ma=86400&quot;,
+  &quot;cf-cache-status&quot;: &quot;DYNAMIC&quot;,
+  &quot;cf-ray&quot;: &quot;a2da325f9f627f22-MAA&quot;,
+  &quot;content-encoding&quot;: &quot;br&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=utf-8&quot;,
+  &quot;date&quot;: &quot;Wed, 19 Aug 2026 15:30:00 GMT&quot;,
+  &quot;origin_request_header&quot;: &quot;*&quot;,
+  &quot;server&quot;: &quot;cloudflare&quot;,
+  &quot;strict-transport-security&quot;: &quot;max-age=15552000; includeSubDomains; preload&quot;,
+  &quot;vary&quot;: &quot;Accept-Encoding, Origin&quot;,
+  &quot;via&quot;: &quot;1.1 google&quot;,
+  &quot;x-content-type-options&quot;: &quot;nosniff&quot;,
+  &quot;x-frame-options&quot;: &quot;SAMEORIGIN&quot;,
+  &quot;x-xss-protection&quot;: &quot;1; mode=block&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call20-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call20-resppayload-content" style="display:none;">{
+  &quot;status&quot;: true,
+  &quot;message&quot;: &quot;Data Fetched Successfully&quot;,
+  &quot;data&quot;: {
+    &quot;isBrandEnable&quot;: true,
+    &quot;isPartnerEnable&quot;: false,
+    &quot;isZeroBounceEnable&quot;: true
+  }
+}</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call21" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://wiz.resul.io/Audience/GetAudienceDashBoardandGridjson</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">3062 ms</span></div><div class="perf-call-body" id="perf1-call21-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call21-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call21-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;wiz.resul.io&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/Audience/GetAudienceDashBoardandGridjson&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;application/json, text/plain, */*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;authorization&quot;: &quot;Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJRQSB0ZXN0b25lIiwianRpIjoiNzlhNzA0YTMtZWY1NC00NmExLWIzNmQtZTM3NjlmYjNlNTg5Iiwic2NvcGUiOiJyZWFkIiwiaHR0cDovL3NjaGVtYXMubWljcm9zb2Z0LmNvbS93cy8yMDA4LzA2L2lkZW50aXR5L2NsYWltcy9yb2xlIjoiQWRtaW4iLCJleHAiOjE3ODcxNTY5NzQsImlzcyI6Ik15QXV0aFNlcnZlciIsImF1ZCI6IlJFU1VMIn0.Zdvstn2NI6CKVqcNbiwm0eyovBC3MT7tdYiCnn4Y9FE&quot;,
+  &quot;content-length&quot;: &quot;85&quot;,
+  &quot;content-type&quot;: &quot;application/json&quot;,
+  &quot;origin&quot;: &quot;https://reacuix.resul.io&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://reacuix.resul.io/&quot;,
+  &quot;reqs&quot;: &quot;BFcChAk9r1WCipIYERaCIQ56OGExbd4FlXJw7sDeIoM=&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;,
+  &quot;x-forwarded-for&quot;: &quot;27bf302e-7576-44a7-9e07-62e347d4a81c&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call21-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call21-reqpayload-content" style="display:none;">{
+  &quot;departmentId&quot;: 3,
+  &quot;userId&quot;: 9383,
+  &quot;clientId&quot;: 6201,
+  &quot;isPartner&quot;: false,
+  &quot;isInternal&quot;: false
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call21-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call21-response-content" style="display:none;">{
+  &quot;access-control-allow-credentials&quot;: &quot;true&quot;,
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;alt-svc&quot;: &quot;h3=\&quot;:443\&quot;; ma=86400&quot;,
+  &quot;cf-cache-status&quot;: &quot;DYNAMIC&quot;,
+  &quot;cf-ray&quot;: &quot;a2da325ede1b7f22-MAA&quot;,
+  &quot;content-encoding&quot;: &quot;br&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=utf-8&quot;,
+  &quot;date&quot;: &quot;Wed, 19 Aug 2026 15:29:59 GMT&quot;,
+  &quot;origin_request_header&quot;: &quot;*&quot;,
+  &quot;server&quot;: &quot;cloudflare&quot;,
+  &quot;strict-transport-security&quot;: &quot;max-age=15552000; includeSubDomains; preload&quot;,
+  &quot;vary&quot;: &quot;Accept-Encoding, Origin&quot;,
+  &quot;via&quot;: &quot;1.1 google&quot;,
+  &quot;x-content-type-options&quot;: &quot;nosniff&quot;,
+  &quot;x-frame-options&quot;: &quot;SAMEORIGIN&quot;,
+  &quot;x-xss-protection&quot;: &quot;1; mode=block&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call21-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call21-resppayload-content" style="display:none;">{&quot;status&quot;:true,&quot;message&quot;:&quot;Success&quot;,&quot;data&quot;:{&quot;audienceDashboardJson&quot;:{&quot;recipientListModel&quot;:{&quot;totalRecipients&quot;:11901,&quot;emailRecipients&quot;:11840,&quot;mobileRecipients&quot;:781,&quot;socialMediaRecipients&quot;:0,&quot;chartFields&quot;:{&quot;Profile Completeness Score&quot;:0,&quot;PCR Segment Type&quot;:0,&quot;Job Title&quot;:4786,&quot;City&quot;:377,&quot;Industry&quot;:89,&quot;Hobbies&quot;:48,&quot;Newattribute053501_17072026_PM&quot;:24,&quot;Newattribute080651_23072026_PM&quot;:24,&quot;Newattribute061553_22072026_PM&quot;:24,&quot;Newattribute032725_28072026_PM&quot;:24,&quot;Newattribute045949_28072026_PM&quot;:24,&quot;Newattribute013352_31072026_PM&quot;:24,&quot;Newattribute034429_21072026_PM&quot;:24,&quot;Newattribute102737_31072026_AM&quot;:24,&quot;Newattribute100312_31072026_AM&quot;:24,&quot;Newattribute033017_31072026_PM&quot;:24,&quot;Newattribute115226_21072026_AM&quot;:24,&quot;Newattribute064227_30072026_PM&quot;:24,&quot;Newattribute053743_31072026_PM&quot;:24,&quot;Newattribute032915_20072026_PM&quot;:24,&quot;Newattribute064613_31072026_PM&quot;:24,&quot;Newattribute032734_17072026_PM&quot;:24,&quot;Newattribute071614_02082026_PM&quot;:24,&quot;Newattribute020858_29072026_PM&quot;:24,&quot;Newattribute025646_29072026_PM&quot;:24,&quot;Newattribute013649_17072026_PM&quot;:24,&quot;Newattribute120609_04082026_AM&quot;:24,&quot;Newattribute061658_04082026_PM&quot;:24,&quot;Newattribute021311_16072026_PM&quot;:24,&quot;Newattribute105214_16072026_AM&quot;:24,&quot;Newattribute051922_30072026_PM&quot;:24,&quot;Newattribute013542_31072026_PM&quot;:23,&quot;Channel&quot;:11901,&quot;Newattribute112905_30072026_AM&quot;:0,&quot;Newattribute054340_30072026_PM&quot;:0,&quot;Newattribute103349_31072026_AM&quot;:0,&quot;Newattribute050806_30072026_PM&quot;:0,&quot;Newattribute051651_30072026_PM&quot;:0,&quot;Newattribute100403_31072026_AM&quot;:0,&quot;Test 30_07_2026&quot;:0,&quot;Newat...</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call22" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://wiz.resul.io/Audience/audiencegridfield</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">3140 ms</span></div><div class="perf-call-body" id="perf1-call22-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call22-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call22-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;wiz.resul.io&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/Audience/audiencegridfield&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;application/json, text/plain, */*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;authorization&quot;: &quot;Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJRQSB0ZXN0b25lIiwianRpIjoiNzlhNzA0YTMtZWY1NC00NmExLWIzNmQtZTM3NjlmYjNlNTg5Iiwic2NvcGUiOiJyZWFkIiwiaHR0cDovL3NjaGVtYXMubWljcm9zb2Z0LmNvbS93cy8yMDA4LzA2L2lkZW50aXR5L2NsYWltcy9yb2xlIjoiQWRtaW4iLCJleHAiOjE3ODcxNTY5NzQsImlzcyI6Ik15QXV0aFNlcnZlciIsImF1ZCI6IlJFU1VMIn0.Zdvstn2NI6CKVqcNbiwm0eyovBC3MT7tdYiCnn4Y9FE&quot;,
+  &quot;content-length&quot;: &quot;123&quot;,
+  &quot;content-type&quot;: &quot;application/json&quot;,
+  &quot;origin&quot;: &quot;https://reacuix.resul.io&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://reacuix.resul.io/&quot;,
+  &quot;reqs&quot;: &quot;BFcChAk9r1WCipIYERaCIQ56OGExbd4FlXJw7sDeIoM=&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;,
+  &quot;x-forwarded-for&quot;: &quot;27bf302e-7576-44a7-9e07-62e347d4a81c&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call22-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call22-reqpayload-content" style="display:none;">{
+  &quot;departmentId&quot;: 3,
+  &quot;userId&quot;: 9383,
+  &quot;clientId&quot;: 6201,
+  &quot;isPartner&quot;: false,
+  &quot;isInternal&quot;: false,
+  &quot;Isupdate&quot;: false,
+  &quot;updateattribute&quot;: []
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call22-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call22-response-content" style="display:none;">{
+  &quot;access-control-allow-credentials&quot;: &quot;true&quot;,
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;alt-svc&quot;: &quot;h3=\&quot;:443\&quot;; ma=86400&quot;,
+  &quot;cf-cache-status&quot;: &quot;DYNAMIC&quot;,
+  &quot;cf-ray&quot;: &quot;a2da325f7f0a7f22-MAA&quot;,
+  &quot;content-encoding&quot;: &quot;br&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=utf-8&quot;,
+  &quot;date&quot;: &quot;Wed, 19 Aug 2026 15:30:00 GMT&quot;,
+  &quot;origin_request_header&quot;: &quot;*&quot;,
+  &quot;server&quot;: &quot;cloudflare&quot;,
+  &quot;strict-transport-security&quot;: &quot;max-age=15552000; includeSubDomains; preload&quot;,
+  &quot;vary&quot;: &quot;Accept-Encoding, Origin&quot;,
+  &quot;via&quot;: &quot;1.1 google&quot;,
+  &quot;x-content-type-options&quot;: &quot;nosniff&quot;,
+  &quot;x-frame-options&quot;: &quot;SAMEORIGIN&quot;,
+  &quot;x-xss-protection&quot;: &quot;1; mode=block&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call22-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call22-resppayload-content" style="display:none;">{&quot;status&quot;:true,&quot;message&quot;:&quot;Success&quot;,&quot;data&quot;:{&quot;selectedattributes&quot;:[{&quot;Age&quot;:&quot;&quot;,&quot;City&quot;:&quot;&quot;,&quot;Designation&quot;:&quot;&quot;,&quot;Email domain&quot;:&quot;msufcu.org&quot;,&quot;EmailID&quot;:&quot;bm*xi*@ms*fc*.o*g&quot;,&quot;FirstName&quot;:&quot;Be*&quot;,&quot;Gender&quot;:&quot;&quot;,&quot;Hobbies&quot;:&quot;&quot;,&quot;LastName&quot;:&quot;&quot;,&quot;ManagerName&quot;:&quot;&quot;,&quot;MobileNo&quot;:&quot;&quot;,&quot;Name&quot;:&quot;&quot;,&quot;Newattribute013649_17072026_PM&quot;:&quot;&quot;,&quot;Newattribute021311_16072026_PM&quot;:&quot;&quot;,&quot;Newattribute032734_17072026_PM&quot;:&quot;&quot;,&quot;Newattribute032915_20072026_PM&quot;:&quot;&quot;,&quot;Newattribute034429_21072026_PM&quot;:&quot;&quot;},{&quot;Age&quot;:&quot;&quot;,&quot;City&quot;:&quot;&quot;,&quot;Designation&quot;:&quot;&quot;,&quot;Email domain&quot;:&quot;forwardbank.com&quot;,&quot;EmailID&quot;:&quot;je*ni*er*@fo*wa*db*nk*co*&quot;,&quot;FirstName&quot;:&quot;&quot;,&quot;Gender&quot;:&quot;&quot;,&quot;Hobbies&quot;:&quot;&quot;,&quot;LastName&quot;:&quot;&quot;,&quot;ManagerName&quot;:&quot;&quot;,&quot;MobileNo&quot;:&quot;&quot;,&quot;Name&quot;:&quot;&quot;,&quot;Newattribute013649_17072026_PM&quot;:&quot;&quot;,&quot;Newattribute021311_16072026_PM&quot;:&quot;&quot;,&quot;Newattribute032734_17072026_PM&quot;:&quot;&quot;,&quot;Newattribute032915_20072026_PM&quot;:&quot;&quot;,&quot;Newattribute034429_21072026_PM&quot;:&quot;&quot;},{&quot;Age&quot;:&quot;41&quot;,&quot;City&quot;:&quot;Pune&quot;,&quot;Designation&quot;:&quot;Business Analyst&quot;,&quot;Email domain&quot;:&quot;gmail.com&quot;,&quot;EmailID&quot;:&quot;rs*tk*31*di*es*@gm*il*co*&quot;,&quot;FirstName&quot;:&quot;&quot;,&quot;Gender&quot;:&quot;Female&quot;,&quot;Hobbies&quot;:&quot;&quot;,&quot;LastName&quot;:&quot;&quot;,&quot;ManagerName&quot;:&quot;&quot;,&quot;MobileNo&quot;:&quot;91*38*03*58*&quot;,&quot;Name&quot;:&quot;Mo*an*Ra* P&quot;,&quot;Newattribute013649_17072026_PM&quot;:&quot;&quot;,&quot;Newattribute021311_16072026_PM&quot;:&quot;&quot;,&quot;Newattribute032734_17072026_PM&quot;:&quot;&quot;,&quot;Newattribute032915_20072026_PM&quot;:&quot;&quot;,&quot;Newattribute034429_21072026_PM&quot;:&quot;&quot;},{&quot;Age&quot;:&quot;&quot;,&quot;City&quot;:&quot;&quot;,&quot;Designation&quot;:&quot;&quot;,&quot;Email domain&quot;:&quot;rackroom.com&quot;,&quot;EmailID&quot;:&quot;bf*em*ng*@ra*kr*om*co*&quot;,&quot;FirstName&quot;:&quot;&quot;,&quot;Gender&quot;:&quot;&quot;,&quot;Hobbies&quot;:&quot;&quot;,&quot;LastName&quot;:&quot;&quot;,&quot;ManagerName&quot;:&quot;&quot;,&quot;MobileNo&quot;:&quot;&quot;,&quot;Name&quot;:&quot;&quot;,&quot;Newattribute013649_17072026_PM&quot;:&quot;&quot;,&quot;Newattribut...</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call23" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://wiz.resul.io/AlertAndNotifications/GetUnreadCount</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">2948 ms</span></div><div class="perf-call-body" id="perf1-call23-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call23-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call23-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;wiz.resul.io&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/AlertAndNotifications/GetUnreadCount&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;application/json, text/plain, */*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;authorization&quot;: &quot;Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJRQSB0ZXN0b25lIiwianRpIjoiNzlhNzA0YTMtZWY1NC00NmExLWIzNmQtZTM3NjlmYjNlNTg5Iiwic2NvcGUiOiJyZWFkIiwiaHR0cDovL3NjaGVtYXMubWljcm9zb2Z0LmNvbS93cy8yMDA4LzA2L2lkZW50aXR5L2NsYWltcy9yb2xlIjoiQWRtaW4iLCJleHAiOjE3ODcxNTY5NzQsImlzcyI6Ik15QXV0aFNlcnZlciIsImF1ZCI6IlJFU1VMIn0.Zdvstn2NI6CKVqcNbiwm0eyovBC3MT7tdYiCnn4Y9FE&quot;,
+  &quot;content-length&quot;: &quot;48&quot;,
+  &quot;content-type&quot;: &quot;application/json&quot;,
+  &quot;origin&quot;: &quot;https://reacuix.resul.io&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://reacuix.resul.io/&quot;,
+  &quot;reqs&quot;: &quot;BFcChAk9r1WCipIYERaCIQ56OGExbd4FlXJw7sDeIoM=&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;,
+  &quot;x-forwarded-for&quot;: &quot;27bf302e-7576-44a7-9e07-62e347d4a81c&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call23-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call23-reqpayload-content" style="display:none;">{
+  &quot;departmentId&quot;: 3,
+  &quot;clientId&quot;: 6201,
+  &quot;userId&quot;: 9383
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call23-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call23-response-content" style="display:none;">{
+  &quot;access-control-allow-credentials&quot;: &quot;true&quot;,
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;alt-svc&quot;: &quot;h3=\&quot;:443\&quot;; ma=86400&quot;,
+  &quot;cf-cache-status&quot;: &quot;DYNAMIC&quot;,
+  &quot;cf-ray&quot;: &quot;a2da3265df047f22-MAA&quot;,
+  &quot;content-encoding&quot;: &quot;br&quot;,
+  &quot;content-type&quot;: &quot;text/plain; charset=utf-8&quot;,
+  &quot;date&quot;: &quot;Wed, 19 Aug 2026 15:30:00 GMT&quot;,
+  &quot;origin_request_header&quot;: &quot;*&quot;,
+  &quot;server&quot;: &quot;cloudflare&quot;,
+  &quot;strict-transport-security&quot;: &quot;max-age=15552000; includeSubDomains; preload&quot;,
+  &quot;vary&quot;: &quot;Accept-Encoding, Origin&quot;,
+  &quot;via&quot;: &quot;1.1 google&quot;,
+  &quot;x-content-type-options&quot;: &quot;nosniff&quot;,
+  &quot;x-frame-options&quot;: &quot;SAMEORIGIN&quot;,
+  &quot;x-xss-protection&quot;: &quot;1; mode=block&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call23-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call23-resppayload-content" style="display:none;">{
+  &quot;status&quot;: true,
+  &quot;message&quot;: &quot;Overall Count&quot;,
+  &quot;data&quot;: 21,
+  &quot;alertId&quot;: 0
+}</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call24" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://wiz.resul.io/Audience/GetListAcquisition</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">4207 ms</span></div><div class="perf-call-body" id="perf1-call24-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call24-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call24-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;wiz.resul.io&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/Audience/GetListAcquisition&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;application/json, text/plain, */*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;authorization&quot;: &quot;Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJRQSB0ZXN0b25lIiwianRpIjoiNzlhNzA0YTMtZWY1NC00NmExLWIzNmQtZTM3NjlmYjNlNTg5Iiwic2NvcGUiOiJyZWFkIiwiaHR0cDovL3NjaGVtYXMubWljcm9zb2Z0LmNvbS93cy8yMDA4LzA2L2lkZW50aXR5L2NsYWltcy9yb2xlIjoiQWRtaW4iLCJleHAiOjE3ODcxNTY5NzQsImlzcyI6Ik15QXV0aFNlcnZlciIsImF1ZCI6IlJFU1VMIn0.Zdvstn2NI6CKVqcNbiwm0eyovBC3MT7tdYiCnn4Y9FE&quot;,
+  &quot;content-length&quot;: &quot;159&quot;,
+  &quot;content-type&quot;: &quot;application/json&quot;,
+  &quot;origin&quot;: &quot;https://reacuix.resul.io&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://reacuix.resul.io/&quot;,
+  &quot;reqs&quot;: &quot;BFcChAk9r1WCipIYERaCIQ56OGExbd4FlXJw7sDeIoM=&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;,
+  &quot;x-forwarded-for&quot;: &quot;27bf302e-7576-44a7-9e07-62e347d4a81c&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call24-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call24-reqpayload-content" style="display:none;">{
+  &quot;departmentId&quot;: 3,
+  &quot;clientId&quot;: 6201,
+  &quot;userId&quot;: 9383,
+  &quot;activityType&quot;: &quot;activity&quot;,
+  &quot;fromDate&quot;: &quot;2026-07-20&quot;,
+  &quot;toDate&quot;: &quot;2026-08-19&quot;,
+  &quot;sourceId&quot;: 0,
+  &quot;sourceName&quot;: &quot;allsources&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call24-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call24-response-content" style="display:none;">{
+  &quot;access-control-allow-credentials&quot;: &quot;true&quot;,
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;alt-svc&quot;: &quot;h3=\&quot;:443\&quot;; ma=86400&quot;,
+  &quot;cf-cache-status&quot;: &quot;DYNAMIC&quot;,
+  &quot;cf-ray&quot;: &quot;a2da327579fe7f22-MAA&quot;,
+  &quot;content-encoding&quot;: &quot;br&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=utf-8&quot;,
+  &quot;date&quot;: &quot;Wed, 19 Aug 2026 15:30:03 GMT&quot;,
+  &quot;origin_request_header&quot;: &quot;*&quot;,
+  &quot;server&quot;: &quot;cloudflare&quot;,
+  &quot;strict-transport-security&quot;: &quot;max-age=15552000; includeSubDomains; preload&quot;,
+  &quot;vary&quot;: &quot;Accept-Encoding, Origin&quot;,
+  &quot;via&quot;: &quot;1.1 google&quot;,
+  &quot;x-content-type-options&quot;: &quot;nosniff&quot;,
+  &quot;x-frame-options&quot;: &quot;SAMEORIGIN&quot;,
+  &quot;x-xss-protection&quot;: &quot;1; mode=block&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call24-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call24-resppayload-content" style="display:none;">{
+  &quot;status&quot;: true,
+  &quot;message&quot;: &quot;Successfully completed&quot;,
+  &quot;data&quot;: {
+    &quot;acquisition&quot;: {
+      &quot;02-Aug-2026&quot;: 0,
+      &quot;03-Aug-2026&quot;: 6,
+      &quot;04-Aug-2026&quot;: 4897,
+      &quot;05-Aug-2026&quot;: 120,
+      &quot;06-Aug-2026&quot;: 0,
+      &quot;10-Aug-2026&quot;: 38,
+      &quot;11-Aug-2026&quot;: 0,
+      &quot;12-Aug-2026&quot;: 9568,
+      &quot;13-Aug-2026&quot;: 0,
+      &quot;14-Aug-2026&quot;: 59,
+      &quot;17-Aug-2026&quot;: 1,
+      &quot;20-Jul-2026&quot;: 0,
+      &quot;21-Jul-2026&quot;: 0,
+      &quot;22-Jul-2026&quot;: 0,
+      &quot;23-Jul-2026&quot;: 0,
+      &quot;25-Jul-2026&quot;: 0,
+      &quot;28-Jul-2026&quot;: 0,
+      &quot;29-Jul-2026&quot;: 580,
+      &quot;30-Jul-2026&quot;: 0,
+      &quot;31-Jul-2026&quot;: 0
+    },
+    &quot;churn&quot;: {
+      &quot;02-Aug-2026&quot;: 3,
+      &quot;03-Aug-2026&quot;: 18,
+      &quot;04-Aug-2026&quot;: 4,
+      &quot;05-Aug-2026&quot;: 1,
+      &quot;06-Aug-2026&quot;: 0,
+      &quot;10-Aug-2026&quot;: 0,
+      &quot;11-Aug-2026&quot;: 0,
+      &quot;12-Aug-2026&quot;: 1,
+      &quot;13-Aug-2026&quot;: 0,
+      &quot;14-Aug-2026&quot;: 0,
+      &quot;17-Aug-2026&quot;: 0,
+      &quot;20-Jul-2026&quot;: 0,
+      &quot;21-Jul-2026&quot;: 0,
+      &quot;22-Jul-2026&quot;: 0,
+      &quot;23-Jul-2026&quot;: 0,
+      &quot;25-Jul-2026&quot;: 0,
+      &quot;28-Jul-2026&quot;: 0,
+      &quot;29-Jul-2026&quot;: 0,
+      &quot;30-Jul-2026&quot;: 8,
+      &quot;31-Jul-2026&quot;: 19
+    }
+  }
+}</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call25" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://wiz.resul.io/Audience/GetRecipientAcquistions</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">5907 ms</span></div><div class="perf-call-body" id="perf1-call25-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call25-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call25-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;wiz.resul.io&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/Audience/GetRecipientAcquistions&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;application/json, text/plain, */*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;authorization&quot;: &quot;Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJRQSB0ZXN0b25lIiwianRpIjoiNzlhNzA0YTMtZWY1NC00NmExLWIzNmQtZTM3NjlmYjNlNTg5Iiwic2NvcGUiOiJyZWFkIiwiaHR0cDovL3NjaGVtYXMubWljcm9zb2Z0LmNvbS93cy8yMDA4LzA2L2lkZW50aXR5L2NsYWltcy9yb2xlIjoiQWRtaW4iLCJleHAiOjE3ODcxNTY5NzQsImlzcyI6Ik15QXV0aFNlcnZlciIsImF1ZCI6IlJFU1VMIn0.Zdvstn2NI6CKVqcNbiwm0eyovBC3MT7tdYiCnn4Y9FE&quot;,
+  &quot;content-length&quot;: &quot;120&quot;,
+  &quot;content-type&quot;: &quot;application/json&quot;,
+  &quot;origin&quot;: &quot;https://reacuix.resul.io&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://reacuix.resul.io/&quot;,
+  &quot;reqs&quot;: &quot;BFcChAk9r1WCipIYERaCIQ56OGExbd4FlXJw7sDeIoM=&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;,
+  &quot;x-forwarded-for&quot;: &quot;27bf302e-7576-44a7-9e07-62e347d4a81c&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call25-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call25-reqpayload-content" style="display:none;">{
+  &quot;departmentId&quot;: 3,
+  &quot;clientId&quot;: 6201,
+  &quot;userId&quot;: 9383,
+  &quot;activityType&quot;: &quot;activity&quot;,
+  &quot;fromDate&quot;: &quot;2026-07-20&quot;,
+  &quot;toDate&quot;: &quot;2026-08-19&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call25-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call25-response-content" style="display:none;">{
+  &quot;access-control-allow-credentials&quot;: &quot;true&quot;,
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;alt-svc&quot;: &quot;h3=\&quot;:443\&quot;; ma=86400&quot;,
+  &quot;cf-cache-status&quot;: &quot;DYNAMIC&quot;,
+  &quot;cf-ray&quot;: &quot;a2da32c91c617f22-MAA&quot;,
+  &quot;content-encoding&quot;: &quot;br&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=utf-8&quot;,
+  &quot;date&quot;: &quot;Wed, 19 Aug 2026 15:30:16 GMT&quot;,
+  &quot;origin_request_header&quot;: &quot;*&quot;,
+  &quot;server&quot;: &quot;cloudflare&quot;,
+  &quot;strict-transport-security&quot;: &quot;max-age=15552000; includeSubDomains; preload&quot;,
+  &quot;vary&quot;: &quot;Accept-Encoding, Origin&quot;,
+  &quot;via&quot;: &quot;1.1 google&quot;,
+  &quot;x-content-type-options&quot;: &quot;nosniff&quot;,
+  &quot;x-frame-options&quot;: &quot;SAMEORIGIN&quot;,
+  &quot;x-xss-protection&quot;: &quot;1; mode=block&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call25-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call25-resppayload-content" style="display:none;">{&quot;status&quot;:true,&quot;message&quot;:&quot;Success&quot;,&quot;data&quot;:[{&quot;recipientAquisitionId&quot;:1,&quot;createdBy&quot;:&quot;QA&quot;,&quot;createdDate&quot;:&quot;2026-08-03 15:32:33&quot;,&quot;modifiedBy&quot;:&quot;&quot;,&quot;modifiedDate&quot;:&quot;&quot;,&quot;departmentId&quot;:3,&quot;eventDate&quot;:&quot;2026-07-17&quot;,&quot;eventChannelName&quot;:&quot;acquisition&quot;,&quot;eventChannelDescription&quot;:&quot;Holiday Campaign Launch&quot;},{&quot;recipientAquisitionId&quot;:2,&quot;createdBy&quot;:&quot;QA&quot;,&quot;createdDate&quot;:&quot;2026-08-03 15:37:46&quot;,&quot;modifiedBy&quot;:&quot;&quot;,&quot;modifiedDate&quot;:&quot;&quot;,&quot;departmentId&quot;:3,&quot;eventDate&quot;:&quot;2026-07-20&quot;,&quot;eventChannelName&quot;:&quot;churn&quot;,&quot;eventChannelDescription&quot;:&quot;Holiday Campaign Launch&quot;},{&quot;recipientAquisitionId&quot;:3,&quot;createdBy&quot;:&quot;QA&quot;,&quot;createdDate&quot;:&quot;2026-08-03 15:42:57&quot;,&quot;modifiedBy&quot;:&quot;&quot;,&quot;modifiedDate&quot;:&quot;&quot;,&quot;departmentId&quot;:3,&quot;eventDate&quot;:&quot;2026-07-20&quot;,&quot;eventChannelName&quot;:&quot;churn&quot;,&quot;eventChannelDescription&quot;:&quot;Holiday Campaign Launch&quot;},{&quot;recipientAquisitionId&quot;:4,&quot;createdBy&quot;:&quot;QA&quot;,&quot;createdDate&quot;:&quot;2026-08-03 15:48:34&quot;,&quot;modifiedBy&quot;:&quot;&quot;,&quot;modifiedDate&quot;:&quot;&quot;,&quot;departmentId&quot;:3,&quot;eventDate&quot;:&quot;2026-07-20&quot;,&quot;eventChannelName&quot;:&quot;churn&quot;,&quot;eventChannelDescription&quot;:&quot;Holiday Campaign Launch&quot;},{&quot;recipientAquisitionId&quot;:5,&quot;createdBy&quot;:&quot;QA&quot;,&quot;createdDate&quot;:&quot;2026-08-03 15:53:58&quot;,&quot;modifiedBy&quot;:&quot;&quot;,&quot;modifiedDate&quot;:&quot;&quot;,&quot;departmentId&quot;:3,&quot;eventDate&quot;:&quot;2026-07-20&quot;,&quot;eventChannelName&quot;:&quot;churn&quot;,&quot;eventChannelDescription&quot;:&quot;Holiday Campaign Launch&quot;},{&quot;recipientAquisitionId&quot;:6,&quot;createdBy&quot;:&quot;QA&quot;,&quot;createdDate&quot;:&quot;2026-08-03 15:58:37&quot;,&quot;modifiedBy&quot;:&quot;&quot;,&quot;modifiedDate&quot;:&quot;&quot;,&quot;departmentId&quot;:3,&quot;eventDate&quot;:&quot;2026-07-20&quot;,&quot;eventChannelName&quot;:&quot;churn&quot;,&quot;eventChannelDescription&quot;:&quot;Holiday Campaign Launch&quot;},{&quot;recipientAquisitionId&quot;:7,&quot;crea...</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call26" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://wiz.resul.io/Audience/audiencegridfield</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">3353 ms</span></div><div class="perf-call-body" id="perf1-call26-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call26-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call26-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;wiz.resul.io&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/Audience/audiencegridfield&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;application/json, text/plain, */*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;authorization&quot;: &quot;Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJRQSB0ZXN0b25lIiwianRpIjoiNzlhNzA0YTMtZWY1NC00NmExLWIzNmQtZTM3NjlmYjNlNTg5Iiwic2NvcGUiOiJyZWFkIiwiaHR0cDovL3NjaGVtYXMubWljcm9zb2Z0LmNvbS93cy8yMDA4LzA2L2lkZW50aXR5L2NsYWltcy9yb2xlIjoiQWRtaW4iLCJleHAiOjE3ODcxNTY5NzQsImlzcyI6Ik15QXV0aFNlcnZlciIsImF1ZCI6IlJFU1VMIn0.Zdvstn2NI6CKVqcNbiwm0eyovBC3MT7tdYiCnn4Y9FE&quot;,
+  &quot;content-length&quot;: &quot;437&quot;,
+  &quot;content-type&quot;: &quot;application/json&quot;,
+  &quot;origin&quot;: &quot;https://reacuix.resul.io&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://reacuix.resul.io/&quot;,
+  &quot;reqs&quot;: &quot;BFcChAk9r1WCipIYERaCIQ56OGExbd4FlXJw7sDeIoM=&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;,
+  &quot;x-forwarded-for&quot;: &quot;27bf302e-7576-44a7-9e07-62e347d4a81c&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call26-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call26-reqpayload-content" style="display:none;">{
+  &quot;departmentId&quot;: 3,
+  &quot;userId&quot;: 9383,
+  &quot;clientId&quot;: 6201,
+  &quot;isPartner&quot;: false,
+  &quot;isInternal&quot;: false,
+  &quot;Isupdate&quot;: true,
+  &quot;updateattribute&quot;: [
+    &quot;Age&quot;,
+    &quot;City&quot;,
+    &quot;Designation&quot;,
+    &quot;Email domain&quot;,
+    &quot;EmailID&quot;,
+    &quot;FirstName&quot;,
+    &quot;Gender&quot;,
+    &quot;Hobbies&quot;,
+    &quot;LastName&quot;,
+    &quot;ManagerName&quot;,
+    &quot;MobileNo&quot;,
+    &quot;Name&quot;,
+    &quot;Newattribute013649_17072026_PM&quot;,
+    &quot;Newattribute021311_16072026_PM&quot;,
+    &quot;Newattribute032734_17072026_PM&quot;,
+    &quot;Newattribute032915_20072026_PM&quot;,
+    &quot;Newattribute034429_21072026_PM&quot;,
+    &quot;24/7 Emergency Service&quot;
+  ]
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call26-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call26-response-content" style="display:none;">{
+  &quot;access-control-allow-credentials&quot;: &quot;true&quot;,
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;alt-svc&quot;: &quot;h3=\&quot;:443\&quot;; ma=86400&quot;,
+  &quot;cf-cache-status&quot;: &quot;DYNAMIC&quot;,
+  &quot;cf-ray&quot;: &quot;a2da33d5abc17f22-MAA&quot;,
+  &quot;content-encoding&quot;: &quot;br&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=utf-8&quot;,
+  &quot;date&quot;: &quot;Wed, 19 Aug 2026 15:30:59 GMT&quot;,
+  &quot;origin_request_header&quot;: &quot;*&quot;,
+  &quot;server&quot;: &quot;cloudflare&quot;,
+  &quot;strict-transport-security&quot;: &quot;max-age=15552000; includeSubDomains; preload&quot;,
+  &quot;vary&quot;: &quot;Accept-Encoding, Origin&quot;,
+  &quot;via&quot;: &quot;1.1 google&quot;,
+  &quot;x-content-type-options&quot;: &quot;nosniff&quot;,
+  &quot;x-frame-options&quot;: &quot;SAMEORIGIN&quot;,
+  &quot;x-xss-protection&quot;: &quot;1; mode=block&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call26-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call26-resppayload-content" style="display:none;">{&quot;status&quot;:true,&quot;message&quot;:&quot;Success&quot;,&quot;data&quot;:{&quot;selectedattributes&quot;:[{&quot;Age&quot;:&quot;&quot;,&quot;City&quot;:&quot;&quot;,&quot;Designation&quot;:&quot;&quot;,&quot;Email domain&quot;:&quot;msufcu.org&quot;,&quot;EmailID&quot;:&quot;bm*xi*@ms*fc*.o*g&quot;,&quot;FirstName&quot;:&quot;Be*&quot;,&quot;Gender&quot;:&quot;&quot;,&quot;Hobbies&quot;:&quot;&quot;,&quot;LastName&quot;:&quot;&quot;,&quot;ManagerName&quot;:&quot;&quot;,&quot;MobileNo&quot;:&quot;&quot;,&quot;Name&quot;:&quot;&quot;,&quot;Newattribute013649_17072026_PM&quot;:&quot;&quot;,&quot;Newattribute021311_16072026_PM&quot;:&quot;&quot;,&quot;Newattribute032734_17072026_PM&quot;:&quot;&quot;,&quot;Newattribute032915_20072026_PM&quot;:&quot;&quot;,&quot;Newattribute034429_21072026_PM&quot;:&quot;&quot;,&quot;24/7 Emergency Service&quot;:&quot;&quot;},{&quot;Age&quot;:&quot;&quot;,&quot;City&quot;:&quot;&quot;,&quot;Designation&quot;:&quot;&quot;,&quot;Email domain&quot;:&quot;forwardbank.com&quot;,&quot;EmailID&quot;:&quot;je*ni*er*@fo*wa*db*nk*co*&quot;,&quot;FirstName&quot;:&quot;&quot;,&quot;Gender&quot;:&quot;&quot;,&quot;Hobbies&quot;:&quot;&quot;,&quot;LastName&quot;:&quot;&quot;,&quot;ManagerName&quot;:&quot;&quot;,&quot;MobileNo&quot;:&quot;&quot;,&quot;Name&quot;:&quot;&quot;,&quot;Newattribute013649_17072026_PM&quot;:&quot;&quot;,&quot;Newattribute021311_16072026_PM&quot;:&quot;&quot;,&quot;Newattribute032734_17072026_PM&quot;:&quot;&quot;,&quot;Newattribute032915_20072026_PM&quot;:&quot;&quot;,&quot;Newattribute034429_21072026_PM&quot;:&quot;&quot;,&quot;24/7 Emergency Service&quot;:&quot;&quot;},{&quot;Age&quot;:&quot;41&quot;,&quot;City&quot;:&quot;Pune&quot;,&quot;Designation&quot;:&quot;Business Analyst&quot;,&quot;Email domain&quot;:&quot;gmail.com&quot;,&quot;EmailID&quot;:&quot;rs*tk*31*di*es*@gm*il*co*&quot;,&quot;FirstName&quot;:&quot;&quot;,&quot;Gender&quot;:&quot;Female&quot;,&quot;Hobbies&quot;:&quot;&quot;,&quot;LastName&quot;:&quot;&quot;,&quot;ManagerName&quot;:&quot;&quot;,&quot;MobileNo&quot;:&quot;91*38*03*58*&quot;,&quot;Name&quot;:&quot;Mo*an*Ra* P&quot;,&quot;Newattribute013649_17072026_PM&quot;:&quot;&quot;,&quot;Newattribute021311_16072026_PM&quot;:&quot;&quot;,&quot;Newattribute032734_17072026_PM&quot;:&quot;&quot;,&quot;Newattribute032915_20072026_PM&quot;:&quot;&quot;,&quot;Newattribute034429_21072026_PM&quot;:&quot;&quot;,&quot;24/7 Emergency Service&quot;:&quot;&quot;},{&quot;Age&quot;:&quot;&quot;,&quot;City&quot;:&quot;&quot;,&quot;Designation&quot;:&quot;&quot;,&quot;Email domain&quot;:&quot;rackroom.com&quot;,&quot;EmailID&quot;:&quot;bf*em*ng*@ra*kr*om*co*&quot;,&quot;FirstName&quot;:&quot;&quot;,&quot;Gender&quot;:&quot;&quot;,&quot;Hobbies&quot;:&quot;&quot;,&quot;LastName&quot;:&quot;&quot;,&quot;Mana...</pre></div></div></div></div></div></div></div></div>
+<script>
+function togglePerfDetails(header) {
+    var detailsRow = document.getElementById(header.getAttribute('data-perf-id') + '-details');
+    if (!detailsRow) return;
+    var expandIcon = header.querySelector('.chevron');
+    if (detailsRow.style.display === 'none') {
+        detailsRow.style.display = 'block';
+        header.setAttribute('data-expanded', 'true');
+        if (expandIcon) { expandIcon.innerHTML = '&#9660;'; }
+    } else {
+        detailsRow.style.display = 'none';
+        header.setAttribute('data-expanded', 'false');
+        if (expandIcon) { expandIcon.innerHTML = '&#9654;'; }
+    }
+}
+function toggleApiCallDetails(header, event) {
+    if (event) event.stopPropagation();
+    var detailsRow = document.getElementById(header.getAttribute('data-call-id') + '-details');
+    if (!detailsRow) return;
+    var expandIcon = header.querySelector('.chevron');
+    if (detailsRow.style.display === 'none') {
+        detailsRow.style.display = 'block';
+        header.setAttribute('data-expanded', 'true');
+        if (expandIcon) { expandIcon.innerHTML = '&#9660;'; }
+    } else {
+        detailsRow.style.display = 'none';
+        header.setAttribute('data-expanded', 'false');
+        if (expandIcon) { expandIcon.innerHTML = '&#9654;'; }
+    }
+}
+function togglePerfTab(label, event) {
+    if (event) event.stopPropagation();
+    var content = document.getElementById(label.getAttribute('data-tab-id') + '-content');
+    if (!content) return;
+    var expandIcon = label.querySelector('.chevron');
+    if (content.style.display === 'none') {
+        content.style.display = 'block';
+        if (expandIcon) { expandIcon.innerHTML = '&#9660;'; }
+    } else {
+        content.style.display = 'none';
+        if (expandIcon) { expandIcon.innerHTML = '&#9654;'; }
+    }
+}
+document.addEventListener('DOMContentLoaded', function() {
+    var searchInput = document.getElementById('perfSearchInput');
+    if (!searchInput) return;
+    searchInput.addEventListener('input', function() {
+        var searchText = searchInput.value.toLowerCase().trim();
+        var cards = document.querySelectorAll('#perfList > .perf-card');
+        cards.forEach(function(card) {
+            var cardText = (card.getAttribute('data-search-text') || '').toLowerCase();
+            card.style.display = (!searchText || cardText.includes(searchText)) ? '' : 'none';
+        });
+    });
+});
+</script>
+        
+</div>
+
+<!-- ===== Lightbox Modal ===== -->
+<div class="modal" id="lightboxModal">
+    <span id="closeModal">&#x2716;</span>
+    <img class="modal-content" id="lightboxImage" style="display:none;"/>
+    <video class="modal-content" id="lightboxVideo" controls style="display:none;"></video>
+</div>
+
+<!-- Floating tooltip for the Last 7 circles (body-level so it isn't clipped by table overflow) -->
+<div id="miniTooltip"></div>
+
+<script>
+/* ===== Navigation ===== */
+function showDetailedReport(moduleFilter) {
+    document.getElementById("summary-section").style.display = "none";
+    document.getElementById("performance-section").style.display = "none";
+    document.getElementById("detailed-section").style.display = "block";
+    window.scrollTo(0, 0);
+
+    // Apply module filter if provided, otherwise show all rows
+    var mainRows = document.querySelectorAll('#testcaseTable > tbody > tr:not(.details-row)');
+    mainRows.forEach(function(row) {
+        var rowModule = (row.getAttribute('data-module') || '').toUpperCase().trim();
+        var filterModule = moduleFilter ? moduleFilter.toUpperCase().trim() : '';
+        var shouldShow = !filterModule || rowModule === filterModule;
+        var testId = row.getAttribute('data-test-id');
+        var detailsRow = document.getElementById(testId + '-details');
+        if (shouldShow) {
+            row.style.display = '';
+            if (detailsRow) {
+                var expanded = row.getAttribute('data-expanded') === 'true';
+                detailsRow.style.display = expanded ? 'table-row' : 'none';
+            }
+        } else {
+            row.style.display = 'none';
+            if (detailsRow) detailsRow.style.display = 'none';
+        }
+    });
+
+    // Reset the search/filter controls to reflect no active text/status filter
+    var searchInput = document.getElementById('searchInput');
+    var statusFilter = document.getElementById('statusFilter');
+    if (searchInput) searchInput.value = '';
+    if (statusFilter) statusFilter.value = '';
+}
+function showSummaryReport() {
+    document.getElementById("detailed-section").style.display = "none";
+    document.getElementById("performance-section").style.display = "none";
+    document.getElementById("summary-section").style.display = "block";
+    window.scrollTo(0, 0);
+}
+function showPerformanceReport() {
+    document.getElementById("summary-section").style.display = "none";
+    document.getElementById("detailed-section").style.display = "none";
+    document.getElementById("performance-section").style.display = "block";
+    window.scrollTo(0, 0);
+}
+
+/* ===== Doughnut Chart ===== */
+document.addEventListener('DOMContentLoaded', function() {
+    var ctx = document.getElementById('chart1');
+    if (ctx) {
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Passed', 'Failed', 'Skipped'],
+                datasets: [{
+                    data: [0, 1, 0],
+                    backgroundColor: ['#28a745', '#dc3545', '#ffc107']
+                }]
+            },
+            options: { plugins: { legend: { position: 'bottom' } } }
+        });
+    }
+    showSummaryReport();
+    populateModuleTable();
+});
+
+/* ===== Module Table ===== */
+var moduleDataRaw = "[{\"module\": \"AUDIENCE\", \"total\": 1, \"passed\": 0, \"failed\": 1, \"skipped\": 0, \"durationMillis\": 135487}]";
+var moduleData = [];
+try { moduleData = JSON.parse(moduleDataRaw); } catch (e) { console.error('Failed to parse module data:', e); }
+
+function formatDuration(ms) {
+    if (!ms || ms <= 0) return '-';
+    var totalSeconds = Math.floor(ms / 1000);
+    var hours = Math.floor(totalSeconds / 3600);
+    var minutes = Math.floor((totalSeconds % 3600) / 60);
+    var seconds = totalSeconds % 60;
+    var pad = function(n) { return n.toString().padStart(2, '0'); };
+    return pad(hours) + ':' + pad(minutes) + ':' + pad(seconds);
+}
+
+function populateModuleTable() {
+    var tableBody = document.getElementById('moduleTableBody');
+    if (!tableBody) return;
+
+    if (!moduleData || moduleData.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#666;">No module data available</td></tr>';
+        return;
+    }
+
+    tableBody.innerHTML = moduleData.map(function(m) {
+        var successRate = m.total > 0 ? ((m.passed / m.total) * 100).toFixed(0) : '0';
+        var slaRate = 90;
+        var modName = (m.module || 'Unknown Module');
+        return '<tr class="module-summary-row" data-filter-module="' + modName + '" style="cursor:pointer;">'
+            + '<td>' + modName + '</td>'
+            + '<td>' + (m.total || 0) + '</td>'
+            + '<td>' + (m.passed || 0) + '</td>'
+            + '<td>' + (m.failed || 0) + '</td>'
+            + '<td>' + (m.skipped || 0) + '</td>'
+            + '<td>' + formatDuration(m.durationMillis || 0) + '</td>'
+            + '<td class="' + (slaRate >= 90 ? 'sla-pass' : 'sla-fail') + '">' + slaRate + '%</td>'
+            + '<td class="' + (successRate >= slaRate ? 'sla-pass' : 'sla-fail') + '">' + successRate + '%</td>'
+            + '</tr>';
+    }).join('');
+
+    // Attach click handlers after rows are in the DOM (avoids all inline-JS quoting issues)
+    document.querySelectorAll('.module-summary-row').forEach(function(row) {
+        row.addEventListener('click', function() {
+            showDetailedReport(this.getAttribute('data-filter-module'));
+        });
+    });
+}
+
+/* ===== Floating tooltip for Last 7 circles =====
+   Lives at body level so it is never clipped by .table-container's overflow.
+   Uses document-level event delegation so it works for dynamically rendered rows. */
+(function() {
+    var tip = document.getElementById('miniTooltip');
+    if (!tip) return;
+
+    function positionTip(target) {
+        var rect = target.getBoundingClientRect();
+        var tipRect = tip.getBoundingClientRect();
+        var left = rect.left + (rect.width / 2) - (tipRect.width / 2);
+        var top = rect.top - tipRect.height - 10;
+        var margin = 6;
+        if (left < margin) left = margin;
+        if (left + tipRect.width > window.innerWidth - margin) {
+            left = window.innerWidth - tipRect.width - margin;
+        }
+        if (top < margin) {
+            // not enough room above — show below
+            top = rect.bottom + 10;
+        }
+        tip.style.left = left + 'px';
+        tip.style.top = top + 'px';
+    }
+
+    document.addEventListener('mouseover', function(e) {
+        // Use closest() rather than checking e.target directly: the mini-circle
+        // icons are now inline SVGs, so hovering the tick/cross/skip graphic
+        // makes e.target the inner <svg>/<path>/<circle>/<line>, not the
+        // .mini-circle span itself. closest() walks up to find the real
+        // tooltip-bearing element regardless of which inner node was hovered.
+        var el = e.target && e.target.closest ? e.target.closest('.mini-circle, .desc-chip-tip') : null;
+        if (!el) return;
+        var text = el.getAttribute('data-tooltip');
+        if (!text) return;
+        tip.textContent = text;
+        tip.style.left = '-9999px';
+        tip.style.top = '-9999px';
+        tip.classList.add('show');
+        requestAnimationFrame(function() { positionTip(el); });
+    });
+
+    document.addEventListener('mouseout', function(e) {
+        var el = e.target && e.target.closest ? e.target.closest('.mini-circle, .desc-chip-tip') : null;
+        if (!el) return;
+        // Don't hide the tooltip if the mouse simply moved to another child
+        // node still inside the same tooltip-bearing element (e.g. from the
+        // <svg> to an inner <path>).
+        var related = e.relatedTarget;
+        if (related && el.contains(related)) return;
+        tip.classList.remove('show');
+    });
+
+    window.addEventListener('scroll', function() {
+        tip.classList.remove('show');
+    }, true);
+})();
+
+/* ===== Lightbox (screenshot + video) ===== */
+document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('screenshot')) {
+        var modal = document.getElementById('lightboxModal');
+        var modalImg = document.getElementById('lightboxImage');
+        var modalVideo = document.getElementById('lightboxVideo');
+        if (modal && modalImg && modalVideo) {
+            modalVideo.style.display = 'none';
+            modalVideo.pause();
+            modalVideo.src = '';
+            modalImg.src = e.target.src;
+            modalImg.style.display = 'block';
+            modal.style.display = 'block';
+        }
+    }
+    if (e.target.id === 'closeModal' || e.target.classList.contains('modal')) {
+        var modal = document.getElementById('lightboxModal');
+        var modalVideo = document.getElementById('lightboxVideo');
+        if (modalVideo) { modalVideo.pause(); modalVideo.src = ''; }
+        if (modal) { modal.style.display = 'none'; }
+    }
+});
+</script>
+</body>
+</html>
