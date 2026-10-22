@@ -1,0 +1,1440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Automation Test Summary Report</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+/* ===== Last 7 inline hand-drawn tick/cross icons ===== */
+.last7-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    width: 100%;
+}
+.mini-circle {
+    width: 23px;
+    height: 23px;
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    cursor: default;
+    transition: transform 0.15s ease;
+    /* "visiblePainted" (SVG default) only responds to hover on painted
+       pixels - fill:none strokes leave the middle of the icon "dead" to the
+       mouse. Forcing pointer-events:all on the whole icon area (including
+       its transparent bits) keeps the tooltip responsive everywhere inside
+       the 26x26 box, not just directly over a stroke line. */
+    pointer-events: all;
+}
+.mini-circle:hover {
+    transform: scale(1.25);
+    z-index: 20;
+}
+.mini-circle svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    pointer-events: all;
+}
+.mini-circle svg * {
+    pointer-events: all;
+}
+
+.th-last7 { text-align: center !important; }
+.td-last7 {
+    white-space: nowrap;
+    text-align: center;
+    overflow: visible !important;
+    padding: 8px 4px !important;
+    display: table-cell;
+    vertical-align: middle;
+}
+.last7-row {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 4px;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+}
+
+/* Hint pill telling the user the Last 7 Execution icons are hoverable.
+   Sits in the toolbar row, pushed to the far right via margin-left:auto
+   on the element itself, reusing the same soft-blue "chip" language as
+   .badge-pass / .desc-chip elsewhere in this report for visual consistency. */
+.last7-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: linear-gradient(90deg, #eff6ff, #e0ecff);
+    color: #1e40af;
+    border: 1px solid #bfdbfe;
+    padding: 8px 14px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    font-weight: 600;
+    letter-spacing: 0.1px;
+    white-space: nowrap;
+}
+.last7-hint-icon {
+    font-size: 1.1em;
+    line-height: 1;
+}
+
+/* Floating tooltip lives in <body> so it can't be clipped by .table-container overflow */
+#miniTooltip {
+    position: fixed;
+    background: #1e293b;
+    color: #fff;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-family: 'Segoe UI', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.1px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-width: 280px;
+    text-align: center;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    z-index: 99999;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+    line-height: 1.45;
+}
+#miniTooltip.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+#miniTooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 7px solid transparent;
+    border-top-color: #1e293b;
+}
+
+/* ===== General Layout ===== */
+body { font-family: 'Segoe UI', sans-serif; background:#f0f4fa; margin:0; color:#333; }
+.header { display:flex; justify-content:space-between; align-items:center; background:linear-gradient(33deg,#8db5f1,#021e49); color:white; padding:10px 20px; }
+.header img { height:40px; }
+.summary-band { background:#0e4494; color:white; display:flex; justify-content:center; gap:30px; padding:8px; font-weight:600; flex-wrap:wrap; }
+.summary-band div { display:flex; align-items:center; gap:5px; }
+.main { display:flex; gap:20px; padding:20px; flex-wrap:wrap; }
+.chart-container { flex:1; display:flex; justify-content:center; align-items:center; min-width:250px; }
+.table-container { flex:1; background:white; padding:15px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.1); overflow-x:hidden; box-sizing:border-box; min-width:300px; width:100%; }
+.table-container table { width:100%; border-collapse:collapse; }
+.table-container th, .table-container td { padding:8px; border-bottom:1px solid #eee; text-align:left; }
+.table-container th { background:#002b6b; color:white; }
+.table-container tbody tr { transition: background 0.15s; cursor: pointer; }
+.table-container tbody tr:hover { background: #eaf2ff !important; box-shadow: inset 3px 0 0 #1a6fd4; }
+.footer { text-align:center; font-size:0.8em; padding:10px; background:#f1f1f1; margin-top:20px; }
+.detailed-section { display: none; }
+
+/* ===== Detail Table ===== */
+#testcaseTable {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 1em;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 16px rgba(14,68,148,0.10);
+}
+#testcaseTable thead tr {
+    background: linear-gradient(90deg, #0e4494 0%, #1a6fd4 100%);
+}
+#testcaseTable thead th {
+    color: #fff;
+    font-weight: 700;
+    padding: 14px 10px;
+    text-align: left;
+    font-size: 0.88em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border: none;
+    white-space: nowrap;
+}
+#testcaseTable thead th.th-expand { width: 40px; text-align: center; }
+#testcaseTable tbody tr:not(.details-row) {
+    background: #fff;
+    transition: background 0.18s;
+    cursor: pointer;
+}
+#testcaseTable tbody tr:not(.details-row):nth-child(even) {
+    background: #f7f9fd;
+}
+#testcaseTable tbody tr:not(.details-row):hover {
+    background: #eaf2ff !important;
+}
+#testcaseTable tbody td {
+    padding: 12px 10px;
+    border-bottom: 1px solid #e8eef5;
+    vertical-align: middle;
+}
+.td-module { font-weight: 600; color: #1e293b; font-size: 0.98em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.td-tcid { font-family: 'Courier New', monospace; font-size: 0.94em; color: #2563eb; font-weight: 700; letter-spacing: 0.3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.td-desc { vertical-align: middle; }
+/* table-layout:fixed keeps each column at its assigned width.
+   The description cell wraps text inside its column so the row height is
+   driven only by the content of that run, not by neighbouring cells growing. */
+#testcaseTable tbody tr:not(.details-row) td {
+    box-sizing: border-box;
+    vertical-align: middle;
+}
+/* Only clip module and tcid columns — never the Last 7 column */
+#testcaseTable tbody td.td-module,
+#testcaseTable tbody td.td-tcid {
+    overflow: hidden;
+}
+.desc-chip {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    background: linear-gradient(90deg, #eff6ff, #e0ecff);
+    color: #1e40af;
+    border: 1px solid #bfdbfe;
+    border-radius: 6px;
+    padding: 7px 12px;
+    font-size: 0.91em;
+    font-weight: 600;
+    letter-spacing: 0.1px;
+    white-space: normal;
+    word-break: break-word;
+    overflow: hidden;
+    line-height: 1.5;
+    vertical-align: middle;
+    box-sizing: border-box;
+    width: 100%;
+    max-height: calc(2 * 1.5em + 14px);
+}
+.td-date { font-size: 0.92em; color: #475569; font-weight: 500; white-space: nowrap; }
+.td-dur { font-size: 0.91em; color: #64748b; white-space: nowrap; text-align: center; }
+
+/* ===== Status Badges ===== */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 14px;
+    border-radius: 20px;
+    font-size: 0.88em;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    white-space: nowrap;
+}
+.badge-pass { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+.badge-fail { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+.badge-skip { background: #fef9c3; color: #92400e; border: 1px solid #fde68a; }
+
+/* ===== Expand Chevron ===== */
+.expand-icon { text-align: center; width: 36px; }
+.chevron {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: #f1f5f9;
+    color: #666;
+    font-size: 10px;
+    transition: all 0.2s ease;
+    border: 1px solid #e2e8f0;
+}
+#testcaseTable tbody tr:hover .chevron {
+    background: #dbeafe;
+    color: #1d4ed8;
+    border-color: #93c5fd;
+}
+
+/* ===== Video Button ===== */
+.video-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: linear-gradient(90deg, #0e4494, #2563eb);
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 0.9em;
+    font-weight: 600;
+    text-decoration: none;
+    transition: opacity 0.15s, transform 0.15s;
+    box-shadow: 0 2px 6px rgba(14,68,148,0.25);
+}
+.video-btn:hover { opacity: 0.92; transform: translateY(-1px); }
+.video-btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px; height: 16px;
+    background: rgba(255,255,255,0.22);
+    border-radius: 50%;
+    font-size: 9px;
+    padding-left: 2px;
+    line-height: 1;
+}
+
+/* ===== Step Table ===== */
+.step-table { width:95%; margin:10px auto; border-collapse:collapse; font-size:0.85em; table-layout:fixed; border-radius:8px; overflow:hidden; }
+.step-table th, .step-table td { border:1px solid #e2e8f0; padding:9px 10px; text-align:left; word-wrap:break-word; overflow-wrap:break-word; }
+.step-table th { background: linear-gradient(90deg,#1e293b,#334155); color:#fff; font-size:0.82em; text-transform:uppercase; letter-spacing:0.5px; }
+.step-table tbody tr { transition: background 0.15s; }
+.step-table tbody tr:hover { background: #eaf2ff !important; }
+.step-table td:nth-child(1), .step-table th:nth-child(1) { width:30%; }
+.step-table td:nth-child(2), .step-table th:nth-child(2) { width:25%; }
+.step-table td:nth-child(3), .step-table th:nth-child(3) { width:25%; }
+.step-table td:nth-child(4), .step-table th:nth-child(4) { width:10%; text-align:center; }
+.step-table td:nth-child(5), .step-table th:nth-child(5) { width:10%; text-align:center; }
+.screenshot { max-width:80px; max-height:80px; object-fit:cover; cursor:pointer; border:1px solid #ccc; border-radius:4px; }
+.api-body-pre { background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:10px; font-size:12px; max-height:300px; overflow:auto; white-space:pre-wrap; word-break:break-word; }
+
+/* ===== Performance Report: scenario / call / tab accordion cards ===== */
+.perf-list { display:flex; flex-direction:column; gap:12px; padding:10px 0; }
+.perf-card { border:1px solid #e2e8f0; border-radius:10px; overflow:hidden; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,0.04); }
+.perf-card-header { display:flex; align-items:center; gap:14px; padding:14px 16px; cursor:pointer; background:#f8fafc; transition:background 0.15s; }
+.perf-card-header:hover { background:#eef2ff; }
+.perf-card-header .chevron { color:#0e4494; font-size:13px; flex-shrink:0; }
+.perf-card-meta { flex:1; min-width:0; }
+.perf-card-title { font-weight:700; color:#1e293b; font-size:0.95em; }
+.perf-tcid-chip { display:inline-block; margin-left:8px; padding:2px 8px; border-radius:12px; background:#e0e7ff; color:#3730a3; font-size:0.78em; font-weight:600; }
+.perf-card-desc { color:#64748b; font-size:0.85em; margin-top:2px; }
+.perf-card-stats { display:flex; align-items:center; gap:10px; flex-shrink:0; }
+.perf-calls-badge { background:#e2e8f0; color:#334155; padding:4px 10px; border-radius:12px; font-size:0.78em; font-weight:600; white-space:nowrap; }
+.perf-error-badge { background:#fdecea; color:#dc3545; padding:4px 10px; border-radius:12px; font-size:0.78em; font-weight:700; white-space:nowrap; }
+.perf-avg-badge { font-weight:700; font-size:0.9em; white-space:nowrap; }
+.perf-card-body { padding:12px 16px; background:#fff; border-top:1px solid #e2e8f0; display:flex; flex-direction:column; gap:8px; }
+.perf-call { border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; }
+.perf-call-error { border-color:#f5c2c7; }
+.perf-call-header { display:flex; align-items:center; gap:12px; padding:10px 12px; cursor:pointer; background:#fafafa; }
+.perf-call-header:hover { background:#f1f5f9; }
+.perf-call-header .chevron { color:#0e4494; font-size:12px; flex-shrink:0; }
+.perf-call-method { font-weight:700; font-size:0.8em; padding:2px 8px; border-radius:4px; background:#1e293b; color:#fff; flex-shrink:0; }
+.perf-call-url { flex:1; min-width:0; word-break:break-all; font-size:0.85em; color:#334155; }
+.perf-call-status { flex-shrink:0; font-size:0.85em; }
+.perf-call-time { flex-shrink:0; font-size:0.85em; color:#64748b; font-family:monospace; }
+.perf-call-body { padding:12px; background:#fff; border-top:1px solid #e2e8f0; }
+.perf-tabs { display:flex; flex-direction:column; gap:6px; }
+.perf-tab-label { cursor:pointer; padding:8px 10px; background:#f1f5f9; border-radius:6px; font-size:0.83em; font-weight:600; color:#334155; }
+.perf-tab-label:hover { background:#e2e8f0; }
+.perf-tab-content { margin-top:4px; }
+.environment-ribbon { background:#f4f6f8; padding:10px; font-size:0.9em; border-bottom:1px solid #ddd; display:flex; justify-content:space-around; flex-wrap:wrap; gap:8px; }
+.toolbar input, .toolbar select, .toolbar button { padding:6px 10px; border-radius:5px; border:1px solid #ccc; }
+.toolbar button { background:#007bff; color:white; border:none; cursor:pointer; }
+
+/* ===== Lightbox Modal ===== */
+.modal {
+    display: none; position: fixed; z-index: 9999;
+    padding-top: 60px; left: 0; top: 0;
+    width: 100%; height: 100%; overflow: auto;
+    background-color: rgba(0,0,0,0.9);
+}
+.modal-content { display:block; margin:auto; max-width:80%; max-height:80%; }
+video.modal-content { width:80%; background:black; }
+#closeModal {
+    position:absolute; top:20px; right:35px;
+    color:#fff; font-size:30px; font-weight:bold; cursor:pointer;
+}
+.chart-container canvas { max-width:300px !important; max-height:300px !important; }
+.detailed-report-link { text-align:right; padding:10px; display:block; }
+.detailed-report-link a { text-decoration:none; }
+.back-btn {
+    background: linear-gradient(90deg, #0e4494 0%, #1a6fd4 100%);
+    color: #fff;
+    padding: 10px 22px;
+    border-radius: 999px;
+    text-decoration: none;
+    box-shadow: 0 4px 14px rgba(14,68,148,0.30);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 14px 0;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.95em;
+    letter-spacing: 0.2px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+    border: none;
+}
+.back-btn:hover {
+    opacity: 0.95;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(14,68,148,0.36);
+}
+.back-btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.05em;
+    line-height: 1;
+}
+.status-pass { color:#28a745; font-weight:bold; }
+.status-fail { color:#dc3545; font-weight:bold; }
+.status-skipped { color:#ffc107; font-weight:bold; }
+.sla-pass { color:#28a745; font-weight:bold; }
+.sla-fail { color:#dc3545; font-weight:bold; }
+</style>
+</head>
+<body>
+
+<!-- ===== Summary Section ===== -->
+<div id="summary-section">
+    <div class="header">
+        <img alt="Company Logo" src="https://www.resulticks.com/images/logos/resulticks-logo-blue.svg"/>
+        <h2>Automation Test Summary Report</h2>
+        <img alt="Product Logo" src="https://run19.resul.io/assets/resulticks-logo-white-391eec89.svg"/>
+    </div>
+    <div class="summary-band">
+        <div>📊 Total: 1</div>
+        <div>✅ Passed: 0</div>
+        <div>❌ Failed: 1</div>
+        <div>⚠️ Skipped: 0</div>
+        <div>⏱️ Duration: 00:04:41</div>
+        <div>🎯 SLA: 90%</div>
+        <div>🎯 Pass Rate: 0.00%</div>
+    </div>
+    <div class="detailed-report-link">
+        <a class="back-btn" onclick="showDetailedReport()"><span class="back-btn-icon">&#8594;</span> Detailed Report</a>
+        <a class="back-btn" onclick="showPerformanceReport()"><span class="back-btn-icon">&#8594;</span> Performance Report</a>
+    </div>
+    <div class="main">
+        <div class="chart-container">
+            <canvas id="chart1"></canvas>
+        </div>
+        <div class="table-container">
+            <h3>Module-wise Results</h3>
+            <table>
+                <tr><th>Module</th><th>Total</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Duration</th><th>SLA %</th><th>Pass %</th></tr>
+                <tbody id="moduleTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+    <div class="footer">
+        Report generated on <span id="current-datetime">26-10-22 13:30:13</span> |
+        Contact: <a href="mailto:qaautomation@resulticks.com">qaautomation@resulticks.com</a>
+    </div>
+</div>
+
+<!-- ===== Detailed Section ===== -->
+<div id="detailed-section" class="detailed-section" style="padding:20px; box-sizing:border-box; width:100%;">
+    <div class="header"><img alt="Company Logo" src="https://www.resulticks.com/images/logos/resulticks-logo-blue.svg"/><h2>Detail Test Report</h2><img alt="Product Logo" src="https://run.resulticks.com/assets/resulticks-logo-white-391eec89.svg"/></div><div class="environment-ribbon"><span><strong>Environment:</strong> run</span><span><strong>Browser:</strong> chrome</span><span><strong>Release:</strong> 5.0</span><span><strong>Execution Date:</strong> 26-10-22 13:30:13</span></div><div style="text-align:right; padding:10px;"><a class="back-btn" onclick="showSummaryReport()"><span class="back-btn-icon">&#8592;</span> Back to Summary</a></div><div class="table-container"><h3>Test Case Results</h3><div class="toolbar"><div style="display:flex; gap:15px; flex-wrap:wrap; align-items:center; margin:20px 0;"><div><label><b>Search:</b></label><input id="searchInput" placeholder="Search test cases..." type="text"/></div><div><label><b>Filter by Status:</b></label><select id="statusFilter"><option value="">All</option><option value="PASS">Passed</option><option value="FAIL">Failed</option><option value="SKIPPED">Skipped</option></select></div><div class="last7-hint" style="margin-left:auto;"><span class="last7-hint-icon">&#9432;</span>Hover over the icons under <b>Last&nbsp;7&nbsp;Execution</b> to view the date &amp; result</div></div></div><table id="testcaseTable">
+<colgroup>
+  <col style="width:40px">
+  <col style="width:11%">
+  <col style="width:10%">
+  <col>
+  <col style="width:9%">
+  <col style="width:8%">
+  <col style="width:10%">
+  <col style="width:26%">
+</colgroup>
+<thead><tr>
+  <th class="th-expand"></th>
+  <th>Module</th>
+  <th>Test Case ID</th>
+  <th>Description</th>
+  <th style="text-align:center;">Status</th>
+  <th style="text-align:center;">Duration</th>
+  <th style="text-align:center;">Video</th>
+  <th class="th-last7">Last 7 Execution</th>
+</tr></thead><tbody><tr data-test-id="tc1" data-status="FAIL" data-expanded="false" data-module="TARGETLIST" data-testcaseid="RS-T20K_10Attr_25Val" data-rundate="26-10-22 1" data-duration="128s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">TARGETLIST</td><td class="td-tcid">RS-T20K_10Attr_25Val</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Validate target list creation with 10 string attributes and 25 data values per attribute">Validate target list creation with 10 string attributes and 25 data values per attribute</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">128s</td><td style="text-align:center;"><span style='color:#bbb'>—</span></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="No Execution Recorded"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8.3" fill="none" stroke="#f2a72e" stroke-width="3"/><line x1="6.1" y1="17.9" x2="17.9" y2="6.1" stroke="#f2a72e" stroke-width="3" stroke-linecap="round"/></svg></span><span class="mini-circle mini-skip" data-tooltip="No Execution Recorded"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8.3" fill="none" stroke="#f2a72e" stroke-width="3"/><line x1="6.1" y1="17.9" x2="17.9" y2="6.1" stroke="#f2a72e" stroke-width="3" stroke-linecap="round"/></svg></span><span class="mini-circle mini-skip" data-tooltip="No Execution Recorded"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8.3" fill="none" stroke="#f2a72e" stroke-width="3"/><line x1="6.1" y1="17.9" x2="17.9" y2="6.1" stroke="#f2a72e" stroke-width="3" stroke-linecap="round"/></svg></span><span class="mini-circle mini-skip" data-tooltip="No Execution Recorded"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8.3" fill="none" stroke="#f2a72e" stroke-width="3"/><line x1="6.1" y1="17.9" x2="17.9" y2="6.1" stroke="#f2a72e" stroke-width="3" stroke-linecap="round"/></svg></span><span class="mini-circle mini-skip" data-tooltip="No Execution Recorded"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8.3" fill="none" stroke="#f2a72e" stroke-width="3"/><line x1="6.1" y1="17.9" x2="17.9" y2="6.1" stroke="#f2a72e" stroke-width="3" stroke-linecap="round"/></svg></span><span class="mini-circle mini-skip" data-tooltip="No Execution Recorded"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8.3" fill="none" stroke="#f2a72e" stroke-width="3"/><line x1="6.1" y1="17.9" x2="17.9" y2="6.1" stroke="#f2a72e" stroke-width="3" stroke-linecap="round"/></svg></span><span class="mini-circle mini-fail" data-tooltip="Thu, 22 Oct 2026 - Fail"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M5.2 5.2 L18.8 18.8 M18.8 5.2 L5.2 18.8" stroke="#e4483f" stroke-width="3.2" stroke-linecap="round"/></svg></span></div></td></tr><tr class="details-row" id="tc1-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>the user logs in to the platform</td><td>User should log in to the platform successfully</td><td>User login failed RUN_5.0https://run.resulticks.com/.</td><td>❌</td><td><img class="screenshot" src="file:///C:/Users/VijayManoharan/PycharmProjects/ResulPy/screenshots/gw0/RS-T20K_10Attr_25Val_20261022132722195351.jpg"/></td></tr><tr><td>Select business unit &#39;Automation Testing&#39;</td><td>Business unit should be selected successfully</td><td>Business unit &#39;Automation Testing&#39; not selected.</td><td>❌</td><td><img class="screenshot" src="file:///C:/Users/VijayManoharan/PycharmProjects/ResulPy/screenshots/gw0/RS-T20K_10Attr_25Val_20261022132741098621.jpg"/></td></tr><tr><td>Generate 20000 audience records using Faker</td><td>20,000 deterministic audience records should be generated using Faker</td><td>Generated 20000 audience records (Upload needed: False)</td><td>✅</td><td><img class="screenshot" src="file:///C:/Users/VijayManoharan/PycharmProjects/ResulPy/screenshots/gw0/RS-T20K_10Attr_25Val_20261022132741479513.jpg"/></td></tr><tr><td>Populate 10 string attributes with 25 distinct data values each</td><td>10 string attributes should each have 25 distinct data values</td><td>Verified 10 string attributes with 25 distinct values each: {&#39;City&#39;: 25, &#39;Department&#39;: 25, &#39;Interest&#39;: 25, &#39;Industry&#39;: 25, &#39;Job function&#39;: 25, &#39;Device type&#39;: 25, &#39;Contact type&#39;: 25, &#39;Hobbies&#39;: 25, &#39;Marital Status&#39;: 25, &#39;Language&#39;: 25}</td><td>✅</td><td><img class="screenshot" src="file:///C:/Users/VijayManoharan/PycharmProjects/ResulPy/screenshots/gw0/RS-T20K_10Attr_25Val_20261022132741704262.jpg"/></td></tr><tr><td>Store generated audience data in temporary test data</td><td>Temporary test data should store 20,000 records</td><td>Stored 20000 records in temporary test data</td><td>✅</td><td><img class="screenshot" src="file:///C:/Users/VijayManoharan/PycharmProjects/ResulPy/screenshots/gw0/RS-T20K_10Attr_25Val_20261022132741886816.jpg"/></td></tr><tr><td>Upload audience data (reusing existing benchmark upload)</td><td>Existing 20,000 audience upload should be reused</td><td>Reused existing 20,000 upload: &#39;B25_121730221020&#39;</td><td>✅</td><td><img class="screenshot" src="file:///C:/Users/VijayManoharan/PycharmProjects/ResulPy/screenshots/gw0/RS-T20K_10Attr_25Val_20261022132742160924.jpg"/></td></tr><tr><td>Verify uploaded audience count is 20,000</td><td>Uploaded audience count should be 20000</td><td>Uploaded audience count verified: 20000</td><td>✅</td><td><img class="screenshot" src="file:///C:/Users/VijayManoharan/PycharmProjects/ResulPy/screenshots/gw0/RS-T20K_10Attr_25Val_20261022132743939718.jpg"/></td></tr><tr><td>the user navigates to Target List Creation</td><td></td><td>Page.goto: net::ERR_NAME_NOT_RESOLVED at https://run.resulticks.com/audience</td><td>❌</td><td><img class="screenshot" src="file:///C:/Users/VijayManoharan/PycharmProjects/ResulPy/screenshots/gw0/RS-T20K_10Attr_25Val_20261022132753232002.jpg"/></td></tr></table></td></tr></tbody></table></div>
+<script>
+function toggleDetails(row) {
+    // row could be the <tr> itself (passed from onclick on the expand td)
+    if (!row || !row.getAttribute) return;
+    var detailsRow = document.getElementById(row.getAttribute('data-test-id') + '-details');
+    if (!detailsRow) return;
+    var expandIcon = row.querySelector('.expand-icon .chevron');
+    if (detailsRow.style.display === 'none') {
+        detailsRow.style.display = 'table-row';
+        row.setAttribute('data-expanded', 'true');
+        if (expandIcon) { expandIcon.innerHTML = '&#9660;'; expandIcon.style.color = '#0e4494'; }
+    } else {
+        detailsRow.style.display = 'none';
+        row.setAttribute('data-expanded', 'false');
+        if (expandIcon) { expandIcon.innerHTML = '&#9654;'; expandIcon.style.color = '#666'; }
+    }
+}
+
+function playVideoHandler(event, element) {
+    event.stopPropagation();
+    event.preventDefault();
+    var modal = document.getElementById('lightboxModal');
+    var modalImg = document.getElementById('lightboxImage');
+    var modalVideo = document.getElementById('lightboxVideo');
+    if (modal && modalImg && modalVideo) {
+        modalImg.style.display = 'none';
+        modalImg.src = '';
+        modalVideo.src = element.getAttribute('data-video');
+        modalVideo.style.display = 'block';
+        modal.style.display = 'block';
+        modalVideo.play();
+    }
+}
+
+function applySearchAndFilter() {
+    var searchText = document.getElementById('searchInput').value.toLowerCase().trim();
+    var filterValue = document.getElementById('statusFilter').value;
+    var mainRows = document.querySelectorAll('#testcaseTable > tbody > tr:not(.details-row)');
+    mainRows.forEach(function(row) {
+        var rowText = row.textContent.toLowerCase();
+        var rowStatus = row.getAttribute('data-status') || '';
+        var matchesSearch = !searchText || rowText.includes(searchText);
+        var matchesFilter = !filterValue || rowStatus === filterValue;
+        var shouldShow = matchesSearch && matchesFilter;
+        var testId = row.getAttribute('data-test-id');
+        var detailsRow = document.getElementById(testId + '-details');
+        if (shouldShow) {
+            row.style.display = '';
+            if (detailsRow) {
+                var expanded = row.getAttribute('data-expanded') === 'true';
+                detailsRow.style.display = expanded ? 'table-row' : 'none';
+            }
+        } else {
+            row.style.display = 'none';
+            if (detailsRow) detailsRow.style.display = 'none';
+            var ch = row.querySelector('.expand-icon .chevron');
+            if (ch) { ch.innerHTML = '&#9654;'; ch.style.color = '#666'; }
+            row.setAttribute('data-expanded', 'false');
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    var searchInput = document.getElementById('searchInput');
+    var statusFilter = document.getElementById('statusFilter');
+    if (searchInput) searchInput.addEventListener('input', applySearchAndFilter);
+    if (statusFilter) statusFilter.addEventListener('change', applySearchAndFilter);
+});
+</script>
+        
+</div>
+
+<!-- ===== Network Performance Section ===== -->
+<div id="performance-section" class="detailed-section" style="padding:20px; box-sizing:border-box; width:100%;">
+    <div class="header"><img alt="Company Logo" src="https://www.resulticks.com/images/logos/resulticks-logo-blue.svg"/><h2>Performance Report</h2><img alt="Product Logo" src="https://run.resulticks.com/assets/resulticks-logo-white-391eec89.svg"/></div><div class="environment-ribbon"><span><strong>Environment:</strong> run</span><span><strong>Browser:</strong> chrome</span><span><strong>Release:</strong> 5.0</span><span><strong>Execution Date:</strong> 26-10-22 13:30:13</span></div><div style="text-align:right; padding:10px;"><a class="back-btn" onclick="showSummaryReport()"><span class="back-btn-icon">&#8592;</span> Back to Summary</a></div><div class="table-container"><h3>Network Performance</h3><div class="toolbar"><div style="display:flex; gap:15px; flex-wrap:wrap; margin:20px 0;"><div><label><b>Search:</b></label><input id="perfSearchInput" placeholder="Search scenarios..." type="text"/></div></div></div><div id="perfList" class="perf-list"><div class="perf-card" data-search-text="TARGETLIST RS-T20K_10Attr_25Val Validate target list creation with 10 string attributes and 25 data values per attribute"><div class="perf-card-header" data-perf-id="perf1" data-expanded="false" onclick="togglePerfDetails(this)"><span class="chevron">&#9654;</span><div class="perf-card-meta"><div class="perf-card-title">TARGETLIST <span class="perf-tcid-chip">RS-T20K_10Attr_25Val</span></div><div class="perf-card-desc">Validate target list creation with 10 string attributes and 25 data values per attribute</div></div><div class="perf-card-stats"><span class="perf-calls-badge">17 calls</span><span class="perf-avg-badge" style="color:#e0a800;">1208 ms avg</span></div></div><div class="perf-card-body" id="perf1-details" style="display:none;"><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call1" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">GET</span><span class="perf-call-url">https://run.resulticks.com/q_DMfA4jV2u4ZRuCjtfnDPH1H4nPDgLdibag7J1T4VrtD89NW8WV9ZfRmgYPRCMBkRRUQKXjWm3AVszeUbNrbiDZd_e_oeNx4gBuph0uvca-Uy0vJ5Rma9MW04X2afvdJTFElWRnT9nMHXayphwbAb74noE9m6iX1XpI3gCMOFle2FTMfxIrRJse9vOXk8VInZW16vd29MMi8qy_uT3mBcd8B6MZg90XetZL1b3r5s4NCN6tZigbIOtlP7ufY4Uu76lIcmMZkU1PfHVOi2VsIrsCAZs0UKHOXbidWRPsojkFXEhBQgXacKZ82xugGCUBcnOpW-WPqaeJ9NocsfV6gj0gtFeI-gR-Wbq2tPHvsSQZ8GdHuRiRVGXjZ-Lhrccd9UE2HPirIfw8Fkc</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">4 ms</span></div><div class="perf-call-body" id="perf1-call1-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call1-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call1-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;run.resulticks.com&quot;,
+  &quot;:method&quot;: &quot;GET&quot;,
+  &quot;:path&quot;: &quot;/q_DMfA4jV2u4ZRuCjtfnDPH1H4nPDgLdibag7J1T4VrtD89NW8WV9ZfRmgYPRCMBkRRUQKXjWm3AVszeUbNrbiDZd_e_oeNx4gBuph0uvca-Uy0vJ5Rma9MW04X2afvdJTFElWRnT9nMHXayphwbAb74noE9m6iX1XpI3gCMOFle2FTMfxIrRJse9vOXk8VInZW16vd29MMi8qy_uT3mBcd8B6MZg90XetZL1b3r5s4NCN6tZigbIOtlP7ufY4Uu76lIcmMZkU1PfHVOi2VsIrsCAZs0UKHOXbidWRPsojkFXEhBQgXacKZ82xugGCUBcnOpW-WPqaeJ9NocsfV6gj0gtFeI-gR-Wbq2tPHvsSQZ8GdHuRiRVGXjZ-Lhrccd9UE2HPirIfw8Fkc&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;*/*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;cookie&quot;: &quot;__cflb=0H28vSAvT6KU92EMv6Rh56mCL1GHbqJHUPSsdwGM6Vi&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-origin&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call1-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call1-reqpayload-content" style="display:none;">-</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call1-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call1-response-content" style="display:none;">{
+  &quot;content-length&quot;: &quot;13987&quot;,
+  &quot;content-type&quot;: &quot;text/css&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call1-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call1-resppayload-content" style="display:none;">@font-face{font-family:Inter;font-style:normal;font-weight:400;src:url(&#39;/HYSe3lVxHHBOcbVD-JDEiRMSA-0IA_0fTajB-VN8kvTfRPAE2IphPxq031aP4igFXnI4Dl9ysTc1hK-stelRr1KHtZ6DdcNVaty9tLGisJGva7uOg2tFyNLZhWsVc37o6HlhtDD0e9MQBLMsugMRPFkWriOFswnrQUtJh_gOWC5itgkQ7ZSgB7IIZ8d3TSBzsVOFPy4ZId0tBkeB6Qa3pv3zJf3UCq7f8KCMGuxqBNLck-oMBvxB-ArQ_zhLVWX_NC6-YF5vqtnkvPNYcH4FTX1g9pfyFQKvI1vCxu47z2SGncZOi9fIxsWpU52ccG_H9jfAQFUDjjZCE5vxEO-TSdkArKMybHmjdRNflSLFpd25b8mqvHAeop4m8bk4P9ik-tz2fgCogBXGTuQmHOE8LGqKvfwVref_Qlfsgx-ZSukj7dbU10kPWi7xoqphjjw3sflu1xpYSzUisksYvUJX4JcBxB9-nA&#39;) format(&quot;woff2&quot;);unicode-range:U+0460-052F,U+1C80-1C88,U+20B4,U+2DE0-2DFF,U+A640-A69F,U+FE2E-FE2F}@font-face{font-family:Inter;font-style:normal;font-weight:400;src:url(&#39;/MoXZBXNeyyoj7mamZy64X5x24qV1dB4fhSEZLTF-UeXH7ksUzTftVmHyzpyT5y3XyHfWfUFYVuQOxyg4LFIoKaebFRepaJwT4iTkXpu1xLbHleWOwt4hzqMrj_s7wGifBAG7m7U7oFUCcRbzKhaqycxy7aExXQTpwvUv_9oc5SZfQjeOiWdP5DKUouNw7X-H4Wa9y5miEYO3lMuOYSLpkptoxx_IKidSb32SqxsK_3QaFaT70BJEAzKN6RjciWZB8Pq_GwivRh8zb8zQxeO-fhK1qAToXEFbDiKoMEBbP01ll0fkI9C8p-DOsZ90EB-CHfT7xts4l9DT2u-r79NA6_U6Rm_CwBPzy_MXviXRqEG62POn9oI13GarAQOzgvr9VQ0vgf7abIFx5hgyacbtTaPC5DkrX7uuOWkhzDY1lJCvU0OgeaKVaeK57xouDeZ8L35fadHJjiy21LHNT184nGOiw8DBow&#39;) format(&quot;woff2&quot;);unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}@font-face{font-family:Inter;font-style:normal;font-weight:400;src:url(&#39;/BKyDFSmZDBcPMMY1sfJ4hpGXHI4FsANEMNS1WJSVyLV-ERpb64M0WUkCN36rvQSfzPbW4E0PHr7Z6J8ceD3gTfM7tH5UDTzO_wl4pmldcspi3QHdyY3pIMATM4dK3XqmKVgygCaKS6l...</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call2" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://run.resulticks.com/8MSB4Ly6gfJ0upbU7L-L14cBiO5mceVeWR615CeGTf-kS-xSE6U14NW1GiPBwBy8EgLo7qLY-0jpIjh2Bg4POH7YJExJaxNxGxyQWrBFoI8yubo9Ev8ubET1yONOwL_HL9CbiXYerDtuoXv4ffkS-dxrV8fKZf79dDc7HLG3jTe7u926i9q7eBs5jhtibm7Am72XT1BaSA8isX6mnahzh1BlWLMvWJrPowRNyZK2wRO59RdO_y8g1GBx23n4TYl5y3-p48B6K5AkuLffjgTiFYps81grkiERqiu6HO4DViH0CvHxpKtYdVEDe4OcmeFwN1EtJOn2aFHI0FVE156jaBzhvUjyupWGKngrfxIGIMrdg14idBmA3fhniJZl-TW6YPoke2tfvaw4HkIGtTPZWMQk-2-MRAbftwZ6E4Adac4gy4_f_RoqrQx36yniRtNRXm_UHCws0reaacfG4A</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">20 ms</span></div><div class="perf-call-body" id="perf1-call2-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call2-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call2-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;run.resulticks.com&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/8MSB4Ly6gfJ0upbU7L-L14cBiO5mceVeWR615CeGTf-kS-xSE6U14NW1GiPBwBy8EgLo7qLY-0jpIjh2Bg4POH7YJExJaxNxGxyQWrBFoI8yubo9Ev8ubET1yONOwL_HL9CbiXYerDtuoXv4ffkS-dxrV8fKZf79dDc7HLG3jTe7u926i9q7eBs5jhtibm7Am72XT1BaSA8isX6mnahzh1BlWLMvWJrPowRNyZK2wRO59RdO_y8g1GBx23n4TYl5y3-p48B6K5AkuLffjgTiFYps81grkiERqiu6HO4DViH0CvHxpKtYdVEDe4OcmeFwN1EtJOn2aFHI0FVE156jaBzhvUjyupWGKngrfxIGIMrdg14idBmA3fhniJZl-TW6YPoke2tfvaw4HkIGtTPZWMQk-2-MRAbftwZ6E4Adac4gy4_f_RoqrQx36yniRtNRXm_UHCws0reaacfG4A&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;*/*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;cache-control&quot;: &quot;max-age=0&quot;,
+  &quot;content-length&quot;: &quot;120&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=UTF-8&quot;,
+  &quot;cookie&quot;: &quot;__cflb=0H28vSAvT6KU92EMv6Rh56mCL1GHbqJHUPSsdwGM6Vi&quot;,
+  &quot;origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-origin&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call2-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call2-reqpayload-content" style="display:none;">{
+  &quot;DOMIdentifiers&quot;: {
+    &quot;rulesType&quot;: 1,
+    &quot;url&quot;: &quot;https://run.resulticks.com/&quot;,
+    &quot;lang&quot;: &quot;en&quot;,
+    &quot;ids&quot;: [
+      &quot;_goober&quot;,
+      &quot;root&quot;
+    ],
+    &quot;classes&quot;: []
+  }
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call2-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call2-response-content" style="display:none;">{
+  &quot;access-control-allow-origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;content-length&quot;: &quot;27757&quot;,
+  &quot;content-type&quot;: &quot;application/octet-stream&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call2-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call2-resppayload-content" style="display:none;">-</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call3" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://run.resulticks.com/xFggVlwMDNbwVS0uaNdHP8n1GDY30Gp4L0uv_lmGYen4p_IjVylxM6lwRQbCnaLLFHZgGxCXI-KmxmP51VHffdmwLkH5EqppvhIs-1NxvPjl21pjla5bz2ZAGMPkciUHd41laeeYyLxNbgNC80IM8dN_5o6nGnYEsz4k3eE-hOBZz_QE7LT7VDDdhTj04iakyrQoosKKN36wQkOEhIZcVO810QqOnSyM2T0l568uCpVDJFZj820N5Sd19uS8Gn1pFJzUrZ-IatNnY-R3sC0QozZjLrvZRpqvQ4URmetPeDn5WWWDD9bbqsPkaVrhKqDQJr7jPa_cGH90opUenKP0IlnfjvClx3hhclDtZikLcclL-OTSAY7H3t-RioHGVM9Ul0TKWIkqHhSvxWuul-S5fbyxUHCpy9bfLojOwurUjjnqRxz91wBVWKOfhdoHv7BNIa7Z2UqeLltjEtQHRw</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">14 ms</span></div><div class="perf-call-body" id="perf1-call3-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call3-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call3-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;run.resulticks.com&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/xFggVlwMDNbwVS0uaNdHP8n1GDY30Gp4L0uv_lmGYen4p_IjVylxM6lwRQbCnaLLFHZgGxCXI-KmxmP51VHffdmwLkH5EqppvhIs-1NxvPjl21pjla5bz2ZAGMPkciUHd41laeeYyLxNbgNC80IM8dN_5o6nGnYEsz4k3eE-hOBZz_QE7LT7VDDdhTj04iakyrQoosKKN36wQkOEhIZcVO810QqOnSyM2T0l568uCpVDJFZj820N5Sd19uS8Gn1pFJzUrZ-IatNnY-R3sC0QozZjLrvZRpqvQ4URmetPeDn5WWWDD9bbqsPkaVrhKqDQJr7jPa_cGH90opUenKP0IlnfjvClx3hhclDtZikLcclL-OTSAY7H3t-RioHGVM9Ul0TKWIkqHhSvxWuul-S5fbyxUHCpy9bfLojOwurUjjnqRxz91wBVWKOfhdoHv7BNIa7Z2UqeLltjEtQHRw&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;*/*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;content-length&quot;: &quot;0&quot;,
+  &quot;cookie&quot;: &quot;__cflb=0H28vSAvT6KU92EMv6Rh56mCL1GHbqJHUPSsdwGM6Vi&quot;,
+  &quot;origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-origin&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call3-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call3-reqpayload-content" style="display:none;">-</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call3-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call3-response-content" style="display:none;">{
+  &quot;access-control-allow-origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;content-length&quot;: &quot;52&quot;,
+  &quot;content-type&quot;: &quot;application/json&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call3-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call3-resppayload-content" style="display:none;">{
+  &quot;subCategory&quot;: 0,
+  &quot;result&quot;: 0,
+  &quot;is_domain_level&quot;: false
+}</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call4" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://run.resulticks.com/CsWdbdgAzf1hkGf1CStuF-m5UijmKswr0FKLBpRC3wT-vxCgSMcR75axgGs3gsihA_-DCm4p_SLuhm5ShjcUwlNdM2QY143R_LAiPai6yHq4Ma_gD01G5QDaHnFaLW4-y9dyc7DRjWzm00GnlX74eBugxjzifUbN48hLLh_86WepGpi4PhlYQ1Syddrbrypmlwu9zvFOfldsSTKyfVgUybGjPTkIq-RngFPmnV-mhF4cik2t3VYneLhh3wtQVhL-wqApcfoKnjXcLX-QkDVpZGKFOjMqleqG-DovfAxHSuWICGQwgyLmJO-4kyvQtRcOeFqmXBzZMZdzdnDOLt6mpUZdB7dz9vxul12iazSvzdrXWSRvWjWewaJe_M8S44Ro04dJrWnXUM7RpAVIubF9ubExv78l0he6lCakxrTnNk0mbdgDexFo5G0wgYC2QNC5ZxZvYDctOtVD7QzZWw</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">11 ms</span></div><div class="perf-call-body" id="perf1-call4-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call4-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call4-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;run.resulticks.com&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/CsWdbdgAzf1hkGf1CStuF-m5UijmKswr0FKLBpRC3wT-vxCgSMcR75axgGs3gsihA_-DCm4p_SLuhm5ShjcUwlNdM2QY143R_LAiPai6yHq4Ma_gD01G5QDaHnFaLW4-y9dyc7DRjWzm00GnlX74eBugxjzifUbN48hLLh_86WepGpi4PhlYQ1Syddrbrypmlwu9zvFOfldsSTKyfVgUybGjPTkIq-RngFPmnV-mhF4cik2t3VYneLhh3wtQVhL-wqApcfoKnjXcLX-QkDVpZGKFOjMqleqG-DovfAxHSuWICGQwgyLmJO-4kyvQtRcOeFqmXBzZMZdzdnDOLt6mpUZdB7dz9vxul12iazSvzdrXWSRvWjWewaJe_M8S44Ro04dJrWnXUM7RpAVIubF9ubExv78l0he6lCakxrTnNk0mbdgDexFo5G0wgYC2QNC5ZxZvYDctOtVD7QzZWw&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;*/*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;content-length&quot;: &quot;2&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=UTF-8&quot;,
+  &quot;cookie&quot;: &quot;__cflb=0H28vSAvT6KU92EMv6Rh56mCL1GHbqJHUPSsdwGM6Vi&quot;,
+  &quot;origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-origin&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call4-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call4-reqpayload-content" style="display:none;">{}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call4-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call4-response-content" style="display:none;">{
+  &quot;access-control-allow-origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;content-length&quot;: &quot;34&quot;,
+  &quot;content-type&quot;: &quot;application/json&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call4-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call4-resppayload-content" style="display:none;">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;result&quot;: 0
+}</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call5" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://run.resulticks.com/8MSB4Ly6gfJ0upbU7L-L14cBiO5mceVeWR615CeGTf-kS-xSE6U14NW1GiPBwBy8EgLo7qLY-0jpIjh2Bg4POH7YJExJaxNxGxyQWrBFoI8yubo9Ev8ubET1yONOwL_HL9CbiXYerDtuoXv4ffkS-dxrV8fKZf79dDc7HLG3jTe7u926i9q7eBs5jhtibm7Am72XT1BaSA8isX6mnahzh1BlWLMvWJrPowRNyZK2wRO59RdO_y8g1GBx23n4TYl5y3-p48B6K5AkuLffjgTiFYps81grkiERqiu6HO4DViH0CvHxpKtYdVEDe4OcmeFwN1EtJOn2aFHI0FVE156jaBzhvUjyupWGKngrfxIGIMrdg14idBmA3fhniJZl-TW6YPoke2tfvaw4HkIGtTPZWMQk-2-MRAbftwZ6E4Adac4gy4_f_RoqrQx36yniRtNRXm_UHCws0reaacfG4A</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">40 ms</span></div><div class="perf-call-body" id="perf1-call5-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call5-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call5-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;run.resulticks.com&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/8MSB4Ly6gfJ0upbU7L-L14cBiO5mceVeWR615CeGTf-kS-xSE6U14NW1GiPBwBy8EgLo7qLY-0jpIjh2Bg4POH7YJExJaxNxGxyQWrBFoI8yubo9Ev8ubET1yONOwL_HL9CbiXYerDtuoXv4ffkS-dxrV8fKZf79dDc7HLG3jTe7u926i9q7eBs5jhtibm7Am72XT1BaSA8isX6mnahzh1BlWLMvWJrPowRNyZK2wRO59RdO_y8g1GBx23n4TYl5y3-p48B6K5AkuLffjgTiFYps81grkiERqiu6HO4DViH0CvHxpKtYdVEDe4OcmeFwN1EtJOn2aFHI0FVE156jaBzhvUjyupWGKngrfxIGIMrdg14idBmA3fhniJZl-TW6YPoke2tfvaw4HkIGtTPZWMQk-2-MRAbftwZ6E4Adac4gy4_f_RoqrQx36yniRtNRXm_UHCws0reaacfG4A&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;*/*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;cache-control&quot;: &quot;max-age=0&quot;,
+  &quot;content-length&quot;: &quot;747&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=UTF-8&quot;,
+  &quot;cookie&quot;: &quot;__cflb=0H28vSAvT6KU92EMv6Rh56mCL1GHbqJHUPSsdwGM6Vi&quot;,
+  &quot;origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-origin&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call5-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call5-reqpayload-content" style="display:none;">{
+  &quot;DOMIdentifiers&quot;: {
+    &quot;rulesType&quot;: 2,
+    &quot;url&quot;: &quot;https://run.resulticks.com/&quot;,
+    &quot;lang&quot;: &quot;en&quot;,
+    &quot;ids&quot;: [
+      &quot;loading&quot;,
+      &quot;ecertificate&quot;
+    ],
+    &quot;classes&quot;: [
+      &quot;rs-page-content-wrapper-container&quot;,
+      &quot;login-route-loading&quot;,
+      &quot;rs-page-content-wrapper&quot;,
+      &quot;login-bg-img&quot;,
+      &quot;rsloading&quot;,
+      &quot;rsloading--login-route&quot;,
+      &quot;loading&quot;,
+      &quot;loading-content&quot;,
+      &quot;loading-tick&quot;,
+      &quot;login-content-area&quot;,
+      &quot;login&quot;,
+      &quot;rs-page-footer-wrapper&quot;,
+      &quot;position-relative&quot;,
+      &quot;container&quot;,
+      &quot;copyright&quot;,
+      &quot;list-group&quot;,
+      &quot;list-group-horizontal&quot;,
+      &quot;init-copyright&quot;,
+      &quot;rs-footer-pb-wrapper&quot;,
+      &quot;powered-by&quot;,
+      &quot;rs-tooltip-wrapper&quot;,
+      &quot;res-tooltip-wrapper&quot;,
+      &quot;lh0&quot;,
+      &quot;w-100&quot;,
+      &quot;tooltip-wrap&quot;,
+      &quot;rs-tooltip-child-wrapper&quot;,
+      &quot;res-tooltip-child-wrapper&quot;,
+      &quot;icon-rs-poweredby-medium&quot;,
+      &quot;icon-md&quot;,
+      &quot;position-absolute&quot;,
+      &quot;top-60&quot;,
+      &quot;right0&quot;,
+      &quot;g-0&quot;,
+      &quot;container-fluid&quot;,
+      &quot;footer-borders-container&quot;
+    ]
+  }
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call5-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call5-response-content" style="display:none;">{
+  &quot;access-control-allow-origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;content-length&quot;: &quot;275&quot;,
+  &quot;content-type&quot;: &quot;application/octet-stream&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call5-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call5-resppayload-content" style="display:none;">-</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call6" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://run.resulticks.com/8MSB4Ly6gfJ0upbU7L-L14cBiO5mceVeWR615CeGTf-kS-xSE6U14NW1GiPBwBy8EgLo7qLY-0jpIjh2Bg4POH7YJExJaxNxGxyQWrBFoI8yubo9Ev8ubET1yONOwL_HL9CbiXYerDtuoXv4ffkS-dxrV8fKZf79dDc7HLG3jTe7u926i9q7eBs5jhtibm7Am72XT1BaSA8isX6mnahzh1BlWLMvWJrPowRNyZK2wRO59RdO_y8g1GBx23n4TYl5y3-p48B6K5AkuLffjgTiFYps81grkiERqiu6HO4DViH0CvHxpKtYdVEDe4OcmeFwN1EtJOn2aFHI0FVE156jaBzhvUjyupWGKngrfxIGIMrdg14idBmA3fhniJZl-TW6YPoke2tfvaw4HkIGtTPZWMQk-2-MRAbftwZ6E4Adac4gy4_f_RoqrQx36yniRtNRXm_UHCws0reaacfG4A</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">12 ms</span></div><div class="perf-call-body" id="perf1-call6-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call6-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call6-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;run.resulticks.com&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/8MSB4Ly6gfJ0upbU7L-L14cBiO5mceVeWR615CeGTf-kS-xSE6U14NW1GiPBwBy8EgLo7qLY-0jpIjh2Bg4POH7YJExJaxNxGxyQWrBFoI8yubo9Ev8ubET1yONOwL_HL9CbiXYerDtuoXv4ffkS-dxrV8fKZf79dDc7HLG3jTe7u926i9q7eBs5jhtibm7Am72XT1BaSA8isX6mnahzh1BlWLMvWJrPowRNyZK2wRO59RdO_y8g1GBx23n4TYl5y3-p48B6K5AkuLffjgTiFYps81grkiERqiu6HO4DViH0CvHxpKtYdVEDe4OcmeFwN1EtJOn2aFHI0FVE156jaBzhvUjyupWGKngrfxIGIMrdg14idBmA3fhniJZl-TW6YPoke2tfvaw4HkIGtTPZWMQk-2-MRAbftwZ6E4Adac4gy4_f_RoqrQx36yniRtNRXm_UHCws0reaacfG4A&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;*/*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;cache-control&quot;: &quot;max-age=0&quot;,
+  &quot;content-length&quot;: &quot;2356&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=UTF-8&quot;,
+  &quot;cookie&quot;: &quot;__cflb=0H28vSAvT6KU92EMv6Rh56mCL1GHbqJHUPSsdwGM6Vi&quot;,
+  &quot;origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-origin&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call6-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call6-reqpayload-content" style="display:none;">{&quot;DOMIdentifiers&quot;:{&quot;rulesType&quot;:2,&quot;url&quot;:&quot;https://run.resulticks.com/&quot;,&quot;lang&quot;:&quot;en&quot;,&quot;ids&quot;:[&quot;emailId&quot;,&quot;rs_ExistingUser_password&quot;,&quot;_r_2_&quot;,&quot;rememberme&quot;,&quot;rs_ExistingUser_forgot&quot;,&quot;rs_ExistingUser_signin&quot;,&quot;rs_DisablePluginModal_proceed&quot;],&quot;classes&quot;:[&quot;brand-logo&quot;,&quot;emojifont&quot;,&quot;res-input-field-required&quot;,&quot;active&quot;,&quot;dropdown-item&quot;,&quot;rs-bootstrap-dropdown-menu&quot;,&quot;dropdown-menu&quot;,&quot;login-container&quot;,&quot;rs-homepage-alert-wrapper&quot;,&quot;login-resul-logo&quot;,&quot;mt25&quot;,&quot;login-info-container&quot;,&quot;mx0&quot;,&quot;row&quot;,&quot;tabBlock&quot;,&quot;px0&quot;,&quot;col&quot;,&quot;loginTabs&quot;,&quot;loginTabs-container&quot;,&quot;rs-chart-tab&quot;,&quot;pointer-event-none&quot;,&quot;mini&quot;,&quot;mb0&quot;,&quot;tabDefault&quot;,&quot;single-tab&quot;,&quot;d-block&quot;,&quot;tab-label&quot;,&quot;login-cont&quot;,&quot;login-cont--loadable&quot;,&quot;tabs-content&quot;,&quot;d-flex&quot;,&quot;rs-login-wrapper&quot;,&quot;login-panel&quot;,&quot;form-group&quot;,&quot;col-md-6&quot;,&quot;rs-bootstrap-dropdown&quot;,&quot;rs-bootstrap-dropdown-with-icon&quot;,&quot;login-existing-user-dropdown&quot;,&quot;rs-dropdown&quot;,&quot;1&quot;,&quot;dropdown&quot;,&quot;dropdown-toggle&quot;,&quot;btn&quot;,&quot;css-scrollbar&quot;,&quot;custome-dropdown-scroll&quot;,&quot;v1-dropdown-data&quot;,&quot;res-input-wrapper&quot;,&quot;res-input-placeholder-wrapper&quot;,&quot;res-input-icon-placeholder&quot;,&quot;res-input-field&quot;,&quot;res-input-wrapper-required&quot;,&quot;res-input-label-text&quot;,&quot;res-input-label-required&quot;,&quot;res-input-border-bottom-required&quot;,&quot;res-input-icon-wrapper&quot;,&quot;res-login-email-status-icon&quot;,&quot;res-login-email-status-icon--email&quot;,&quot;res-login-email-status-icon__svg&quot;,&quot;res-login-email-status-icon__email&quot;,&quot;res-login-email-status-icon__email-line&quot;,&quot;res-login-email-status-icon__email-box&quot;,&quot;res-login-email-status-icon__email-flap&quot;,&quot;res-login-email-status-icon__email-fold&quot;,&quot;res-login...</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call6-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call6-response-content" style="display:none;">{
+  &quot;access-control-allow-origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;content-length&quot;: &quot;334&quot;,
+  &quot;content-type&quot;: &quot;application/octet-stream&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call6-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call6-resppayload-content" style="display:none;">-</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call7" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">GET</span><span class="perf-call-url">https://geolocation-db.com/json/</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">1914 ms</span></div><div class="perf-call-body" id="perf1-call7-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call7-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call7-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;geolocation-db.com&quot;,
+  &quot;:method&quot;: &quot;GET&quot;,
+  &quot;:path&quot;: &quot;/json/&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;application/json, text/plain, */*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;cross-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call7-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call7-reqpayload-content" style="display:none;">-</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call7-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call7-response-content" style="display:none;">{
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;content-encoding&quot;: &quot;gzip&quot;,
+  &quot;content-type&quot;: &quot;text/html; charset=UTF-8&quot;,
+  &quot;date&quot;: &quot;Thu, 22 Oct 2026 07:55:57 GMT&quot;,
+  &quot;server&quot;: &quot;nginx/1.14.0 (Ubuntu)&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call7-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call7-resppayload-content" style="display:none;">{
+  &quot;country_code&quot;: &quot;IN&quot;,
+  &quot;country_name&quot;: &quot;India&quot;,
+  &quot;city&quot;: null,
+  &quot;postal&quot;: null,
+  &quot;latitude&quot;: 20,
+  &quot;longitude&quot;: 77,
+  &quot;IPv4&quot;: &quot;1.38.99.105&quot;,
+  &quot;state&quot;: null
+}</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call8" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://runwizv5.resul.io/AccountSetup/GetIPData</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 201</span><span class="perf-call-time">2158 ms</span></div><div class="perf-call-body" id="perf1-call8-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call8-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call8-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;runwizv5.resul.io&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/AccountSetup/GetIPData&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;application/json, text/plain, */*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;authorization&quot;: &quot;Bearer null&quot;,
+  &quot;content-length&quot;: &quot;27&quot;,
+  &quot;content-type&quot;: &quot;application/json&quot;,
+  &quot;origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/&quot;,
+  &quot;reqs&quot;: &quot;null&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;cross-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;,
+  &quot;x-forwarded-for&quot;: &quot;null&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call8-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call8-reqpayload-content" style="display:none;">{
+  &quot;ipaddress&quot;: &quot;1.38.99.105&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call8-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call8-response-content" style="display:none;">{
+  &quot;access-control-allow-credentials&quot;: &quot;true&quot;,
+  &quot;access-control-allow-methods&quot;: &quot;GET, POST, OPTIONS&quot;,
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;cf-cache-status&quot;: &quot;DYNAMIC&quot;,
+  &quot;cf-ray&quot;: &quot;a4e6f161fb1e9c38-SIN&quot;,
+  &quot;content-encoding&quot;: &quot;br&quot;,
+  &quot;content-security-policy&quot;: &quot;default-src &#39;self&#39;;   style-src &#39;self&#39; &#39;unsafe-inline&#39;;   script-src &#39;self&#39;;   img-src &#39;self&#39; data:;   connect-src &#39;self&#39; https://run19.resul.io https://*.resul.io;   form-action &#39;self&#39; https://run19.resul.io https://*.resul.io   frame-ancestors &#39;self&#39;;&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=utf-8&quot;,
+  &quot;date&quot;: &quot;Thu, 22 Oct 2026 07:56:00 GMT&quot;,
+  &quot;origin_request_header&quot;: &quot;*&quot;,
+  &quot;server&quot;: &quot;cloudflare&quot;,
+  &quot;strict-transport-security&quot;: &quot;max-age=15552000; includeSubDomains; preload&quot;,
+  &quot;vary&quot;: &quot;Accept-Encoding,Origin,Origin&quot;,
+  &quot;via&quot;: &quot;1.1 google&quot;,
+  &quot;x-content-type-options&quot;: &quot;nosniff&quot;,
+  &quot;x-frame-options&quot;: &quot;SAMEORIGIN&quot;,
+  &quot;x-xss-protection&quot;: &quot;1; mode=block&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call8-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call8-resppayload-content" style="display:none;">{
+  &quot;status&quot;: true,
+  &quot;message&quot;: &quot;Successfull&quot;,
+  &quot;data&quot;: {
+    &quot;latitude&quot;: &quot;13.0895&quot;,
+    &quot;longitude&quot;: &quot;80.2739&quot;,
+    &quot;country&quot;: &quot;India&quot;,
+    &quot;countryCode&quot;: &quot;IN&quot;,
+    &quot;city&quot;: &quot;Chennai&quot;,
+    &quot;location&quot;: &quot;TN&quot;,
+    &quot;istCode&quot;: &quot;91&quot;,
+    &quot;countryID&quot;: 3,
+    &quot;currencyID&quot;: 1,
+    &quot;defaultLanguageID&quot;: 1,
+    &quot;defaultDateformatID&quot;: 2,
+    &quot;defaultTimeFormatID&quot;: 0,
+    &quot;defaultTimeZoneID&quot;: 64
+  }
+}</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call9" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://run.resulticks.com/8MSB4Ly6gfJ0upbU7L-L14cBiO5mceVeWR615CeGTf-kS-xSE6U14NW1GiPBwBy8EgLo7qLY-0jpIjh2Bg4POH7YJExJaxNxGxyQWrBFoI8yubo9Ev8ubET1yONOwL_HL9CbiXYerDtuoXv4ffkS-dxrV8fKZf79dDc7HLG3jTe7u926i9q7eBs5jhtibm7Am72XT1BaSA8isX6mnahzh1BlWLMvWJrPowRNyZK2wRO59RdO_y8g1GBx23n4TYl5y3-p48B6K5AkuLffjgTiFYps81grkiERqiu6HO4DViH0CvHxpKtYdVEDe4OcmeFwN1EtJOn2aFHI0FVE156jaBzhvUjyupWGKngrfxIGIMrdg14idBmA3fhniJZl-TW6YPoke2tfvaw4HkIGtTPZWMQk-2-MRAbftwZ6E4Adac4gy4_f_RoqrQx36yniRtNRXm_UHCws0reaacfG4A</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">9 ms</span></div><div class="perf-call-body" id="perf1-call9-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call9-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call9-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;run.resulticks.com&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/8MSB4Ly6gfJ0upbU7L-L14cBiO5mceVeWR615CeGTf-kS-xSE6U14NW1GiPBwBy8EgLo7qLY-0jpIjh2Bg4POH7YJExJaxNxGxyQWrBFoI8yubo9Ev8ubET1yONOwL_HL9CbiXYerDtuoXv4ffkS-dxrV8fKZf79dDc7HLG3jTe7u926i9q7eBs5jhtibm7Am72XT1BaSA8isX6mnahzh1BlWLMvWJrPowRNyZK2wRO59RdO_y8g1GBx23n4TYl5y3-p48B6K5AkuLffjgTiFYps81grkiERqiu6HO4DViH0CvHxpKtYdVEDe4OcmeFwN1EtJOn2aFHI0FVE156jaBzhvUjyupWGKngrfxIGIMrdg14idBmA3fhniJZl-TW6YPoke2tfvaw4HkIGtTPZWMQk-2-MRAbftwZ6E4Adac4gy4_f_RoqrQx36yniRtNRXm_UHCws0reaacfG4A&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;*/*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;cache-control&quot;: &quot;max-age=0&quot;,
+  &quot;content-length&quot;: &quot;142&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=UTF-8&quot;,
+  &quot;cookie&quot;: &quot;__cflb=0H28vSAvT6KU92EMv6Rh56mCL1GHbqJHUPSsdwGM6Vi&quot;,
+  &quot;origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-origin&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call9-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call9-reqpayload-content" style="display:none;">{
+  &quot;DOMIdentifiers&quot;: {
+    &quot;rulesType&quot;: 2,
+    &quot;url&quot;: &quot;https://run.resulticks.com/&quot;,
+    &quot;lang&quot;: &quot;en&quot;,
+    &quot;ids&quot;: [],
+    &quot;classes&quot;: [
+      &quot;res-login-email-status-icon--loading&quot;
+    ]
+  }
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call9-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call9-response-content" style="display:none;">{
+  &quot;access-control-allow-origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;content-length&quot;: &quot;165&quot;,
+  &quot;content-type&quot;: &quot;application/octet-stream&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call9-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call9-resppayload-content" style="display:none;">L7n&lt;&gt;#/)(9&gt;- -/8%#&quot;?nv&#96;n?) )/8#&gt;?nv&quot;9  &#96;n$%()?) )/8#&gt;?nv&quot;9  &#96;n/##&#39;%)?) )/8#&gt;?nv&quot;9  &#96;n/##&#39;%)$%()?) )/8#&gt;?nv&quot;9  &#96;n+)&quot;)&gt;%/$%()nv*- ?)&#96;n/##&#39;%)+)&quot;)&gt;%/$%()nv*- ?)1</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call10" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://runwizv5.resul.io/AccountSetup/CheckEmailExists</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">1230 ms</span></div><div class="perf-call-body" id="perf1-call10-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call10-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call10-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;runwizv5.resul.io&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/AccountSetup/CheckEmailExists&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;application/json, text/plain, */*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;authorization&quot;: &quot;Bearer null&quot;,
+  &quot;content-length&quot;: &quot;123&quot;,
+  &quot;content-type&quot;: &quot;application/json&quot;,
+  &quot;origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/&quot;,
+  &quot;reqs&quot;: &quot;null&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;cross-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;,
+  &quot;x-forwarded-for&quot;: &quot;null&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call10-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call10-reqpayload-content" style="display:none;">{
+  &quot;emailId&quot;: &quot;sPYvIrGMeYvnmihBUO7WJE1wsW1w+nhVPSzlzLXWhdgpNLJedVBqzAA8MYpyTOTq&quot;,
+  &quot;hashval&quot;: &quot;aF5AbyI4RV9iLkBfOlBbOVEkY1J3Tw==&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call10-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call10-response-content" style="display:none;">{
+  &quot;access-control-allow-credentials&quot;: &quot;true&quot;,
+  &quot;access-control-allow-methods&quot;: &quot;GET, POST, OPTIONS&quot;,
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;cf-cache-status&quot;: &quot;DYNAMIC&quot;,
+  &quot;cf-ray&quot;: &quot;a4e6f16bfc919c38-SIN&quot;,
+  &quot;content-encoding&quot;: &quot;br&quot;,
+  &quot;content-security-policy&quot;: &quot;default-src &#39;self&#39;;   style-src &#39;self&#39; &#39;unsafe-inline&#39;;   script-src &#39;self&#39;;   img-src &#39;self&#39; data:;   connect-src &#39;self&#39; https://run19.resul.io https://*.resul.io;   form-action &#39;self&#39; https://run19.resul.io https://*.resul.io   frame-ancestors &#39;self&#39;;&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=utf-8&quot;,
+  &quot;date&quot;: &quot;Thu, 22 Oct 2026 07:56:01 GMT&quot;,
+  &quot;origin_request_header&quot;: &quot;*&quot;,
+  &quot;server&quot;: &quot;cloudflare&quot;,
+  &quot;strict-transport-security&quot;: &quot;max-age=15552000; includeSubDomains; preload&quot;,
+  &quot;vary&quot;: &quot;Accept-Encoding,Origin,Origin&quot;,
+  &quot;via&quot;: &quot;1.1 google&quot;,
+  &quot;x-content-type-options&quot;: &quot;nosniff&quot;,
+  &quot;x-frame-options&quot;: &quot;SAMEORIGIN&quot;,
+  &quot;x-xss-protection&quot;: &quot;1; mode=block&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call10-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call10-resppayload-content" style="display:none;">{
+  &quot;status&quot;: true,
+  &quot;message&quot;: &quot;Email already exist&quot;,
+  &quot;data&quot;: {}
+}</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call11" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://run.resulticks.com/8MSB4Ly6gfJ0upbU7L-L14cBiO5mceVeWR615CeGTf-kS-xSE6U14NW1GiPBwBy8EgLo7qLY-0jpIjh2Bg4POH7YJExJaxNxGxyQWrBFoI8yubo9Ev8ubET1yONOwL_HL9CbiXYerDtuoXv4ffkS-dxrV8fKZf79dDc7HLG3jTe7u926i9q7eBs5jhtibm7Am72XT1BaSA8isX6mnahzh1BlWLMvWJrPowRNyZK2wRO59RdO_y8g1GBx23n4TYl5y3-p48B6K5AkuLffjgTiFYps81grkiERqiu6HO4DViH0CvHxpKtYdVEDe4OcmeFwN1EtJOn2aFHI0FVE156jaBzhvUjyupWGKngrfxIGIMrdg14idBmA3fhniJZl-TW6YPoke2tfvaw4HkIGtTPZWMQk-2-MRAbftwZ6E4Adac4gy4_f_RoqrQx36yniRtNRXm_UHCws0reaacfG4A</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">15 ms</span></div><div class="perf-call-body" id="perf1-call11-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call11-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call11-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;run.resulticks.com&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/8MSB4Ly6gfJ0upbU7L-L14cBiO5mceVeWR615CeGTf-kS-xSE6U14NW1GiPBwBy8EgLo7qLY-0jpIjh2Bg4POH7YJExJaxNxGxyQWrBFoI8yubo9Ev8ubET1yONOwL_HL9CbiXYerDtuoXv4ffkS-dxrV8fKZf79dDc7HLG3jTe7u926i9q7eBs5jhtibm7Am72XT1BaSA8isX6mnahzh1BlWLMvWJrPowRNyZK2wRO59RdO_y8g1GBx23n4TYl5y3-p48B6K5AkuLffjgTiFYps81grkiERqiu6HO4DViH0CvHxpKtYdVEDe4OcmeFwN1EtJOn2aFHI0FVE156jaBzhvUjyupWGKngrfxIGIMrdg14idBmA3fhniJZl-TW6YPoke2tfvaw4HkIGtTPZWMQk-2-MRAbftwZ6E4Adac4gy4_f_RoqrQx36yniRtNRXm_UHCws0reaacfG4A&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;*/*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;cache-control&quot;: &quot;max-age=0&quot;,
+  &quot;content-length&quot;: &quot;140&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=UTF-8&quot;,
+  &quot;cookie&quot;: &quot;__cflb=0H28vSAvT6KU92EMv6Rh56mCL1GHbqJHUPSsdwGM6Vi&quot;,
+  &quot;origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-origin&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call11-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call11-reqpayload-content" style="display:none;">{
+  &quot;DOMIdentifiers&quot;: {
+    &quot;rulesType&quot;: 2,
+    &quot;url&quot;: &quot;https://run.resulticks.com/&quot;,
+    &quot;lang&quot;: &quot;en&quot;,
+    &quot;ids&quot;: [],
+    &quot;classes&quot;: [
+      &quot;res-login-email-status-icon--valid&quot;
+    ]
+  }
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call11-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call11-response-content" style="display:none;">{
+  &quot;access-control-allow-origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;content-length&quot;: &quot;165&quot;,
+  &quot;content-type&quot;: &quot;application/octet-stream&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call11-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call11-resppayload-content" style="display:none;">/T_]@LJKZ]NCpNL[F@A\tr\JCJL[@]\AZCCGFKJp\JCJL[@]\AZCCL@@DFJp\JCJL[@]\AZCCL@@DFJpGFKJp\JCJL[@]\AZCCHJAJ]FLGFKJINC\JL@@DFJpHJAJ]FLGFKJINC\JR</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call12" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://run.resulticks.com/8MSB4Ly6gfJ0upbU7L-L14cBiO5mceVeWR615CeGTf-kS-xSE6U14NW1GiPBwBy8EgLo7qLY-0jpIjh2Bg4POH7YJExJaxNxGxyQWrBFoI8yubo9Ev8ubET1yONOwL_HL9CbiXYerDtuoXv4ffkS-dxrV8fKZf79dDc7HLG3jTe7u926i9q7eBs5jhtibm7Am72XT1BaSA8isX6mnahzh1BlWLMvWJrPowRNyZK2wRO59RdO_y8g1GBx23n4TYl5y3-p48B6K5AkuLffjgTiFYps81grkiERqiu6HO4DViH0CvHxpKtYdVEDe4OcmeFwN1EtJOn2aFHI0FVE156jaBzhvUjyupWGKngrfxIGIMrdg14idBmA3fhniJZl-TW6YPoke2tfvaw4HkIGtTPZWMQk-2-MRAbftwZ6E4Adac4gy4_f_RoqrQx36yniRtNRXm_UHCws0reaacfG4A</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">10 ms</span></div><div class="perf-call-body" id="perf1-call12-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call12-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call12-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;run.resulticks.com&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/8MSB4Ly6gfJ0upbU7L-L14cBiO5mceVeWR615CeGTf-kS-xSE6U14NW1GiPBwBy8EgLo7qLY-0jpIjh2Bg4POH7YJExJaxNxGxyQWrBFoI8yubo9Ev8ubET1yONOwL_HL9CbiXYerDtuoXv4ffkS-dxrV8fKZf79dDc7HLG3jTe7u926i9q7eBs5jhtibm7Am72XT1BaSA8isX6mnahzh1BlWLMvWJrPowRNyZK2wRO59RdO_y8g1GBx23n4TYl5y3-p48B6K5AkuLffjgTiFYps81grkiERqiu6HO4DViH0CvHxpKtYdVEDe4OcmeFwN1EtJOn2aFHI0FVE156jaBzhvUjyupWGKngrfxIGIMrdg14idBmA3fhniJZl-TW6YPoke2tfvaw4HkIGtTPZWMQk-2-MRAbftwZ6E4Adac4gy4_f_RoqrQx36yniRtNRXm_UHCws0reaacfG4A&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;*/*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;cache-control&quot;: &quot;max-age=0&quot;,
+  &quot;content-length&quot;: &quot;142&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=UTF-8&quot;,
+  &quot;cookie&quot;: &quot;__cflb=0H28vSAvT6KU92EMv6Rh56mCL1GHbqJHUPSsdwGM6Vi&quot;,
+  &quot;origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-origin&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call12-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call12-reqpayload-content" style="display:none;">{
+  &quot;DOMIdentifiers&quot;: {
+    &quot;rulesType&quot;: 2,
+    &quot;url&quot;: &quot;https://run.resulticks.com/&quot;,
+    &quot;lang&quot;: &quot;en&quot;,
+    &quot;ids&quot;: [],
+    &quot;classes&quot;: [
+      &quot;pe-none&quot;,
+      &quot;click-off&quot;,
+      &quot;segment_loader&quot;
+    ]
+  }
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call12-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call12-response-content" style="display:none;">{
+  &quot;access-control-allow-origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;content-length&quot;: &quot;165&quot;,
+  &quot;content-type&quot;: &quot;application/octet-stream&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call12-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call12-resppayload-content" style="display:none;">-</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call13" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://run.resulticks.com/8MSB4Ly6gfJ0upbU7L-L14cBiO5mceVeWR615CeGTf-kS-xSE6U14NW1GiPBwBy8EgLo7qLY-0jpIjh2Bg4POH7YJExJaxNxGxyQWrBFoI8yubo9Ev8ubET1yONOwL_HL9CbiXYerDtuoXv4ffkS-dxrV8fKZf79dDc7HLG3jTe7u926i9q7eBs5jhtibm7Am72XT1BaSA8isX6mnahzh1BlWLMvWJrPowRNyZK2wRO59RdO_y8g1GBx23n4TYl5y3-p48B6K5AkuLffjgTiFYps81grkiERqiu6HO4DViH0CvHxpKtYdVEDe4OcmeFwN1EtJOn2aFHI0FVE156jaBzhvUjyupWGKngrfxIGIMrdg14idBmA3fhniJZl-TW6YPoke2tfvaw4HkIGtTPZWMQk-2-MRAbftwZ6E4Adac4gy4_f_RoqrQx36yniRtNRXm_UHCws0reaacfG4A</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">10 ms</span></div><div class="perf-call-body" id="perf1-call13-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call13-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call13-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;run.resulticks.com&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/8MSB4Ly6gfJ0upbU7L-L14cBiO5mceVeWR615CeGTf-kS-xSE6U14NW1GiPBwBy8EgLo7qLY-0jpIjh2Bg4POH7YJExJaxNxGxyQWrBFoI8yubo9Ev8ubET1yONOwL_HL9CbiXYerDtuoXv4ffkS-dxrV8fKZf79dDc7HLG3jTe7u926i9q7eBs5jhtibm7Am72XT1BaSA8isX6mnahzh1BlWLMvWJrPowRNyZK2wRO59RdO_y8g1GBx23n4TYl5y3-p48B6K5AkuLffjgTiFYps81grkiERqiu6HO4DViH0CvHxpKtYdVEDe4OcmeFwN1EtJOn2aFHI0FVE156jaBzhvUjyupWGKngrfxIGIMrdg14idBmA3fhniJZl-TW6YPoke2tfvaw4HkIGtTPZWMQk-2-MRAbftwZ6E4Adac4gy4_f_RoqrQx36yniRtNRXm_UHCws0reaacfG4A&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;*/*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;cache-control&quot;: &quot;max-age=0&quot;,
+  &quot;content-length&quot;: &quot;116&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=UTF-8&quot;,
+  &quot;cookie&quot;: &quot;__cflb=0H28vSAvT6KU92EMv6Rh56mCL1GHbqJHUPSsdwGM6Vi&quot;,
+  &quot;origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-origin&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call13-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call13-reqpayload-content" style="display:none;">{
+  &quot;DOMIdentifiers&quot;: {
+    &quot;rulesType&quot;: 2,
+    &quot;url&quot;: &quot;https://run.resulticks.com/&quot;,
+    &quot;lang&quot;: &quot;en&quot;,
+    &quot;ids&quot;: [],
+    &quot;classes&quot;: [
+      &quot;opacity-50&quot;
+    ]
+  }
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call13-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call13-response-content" style="display:none;">{
+  &quot;access-control-allow-origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;content-length&quot;: &quot;165&quot;,
+  &quot;content-type&quot;: &quot;application/octet-stream&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call13-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call13-resppayload-content" style="display:none;">-</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call14" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://runwizv5.resul.io/AccountSetup/GetMasterData</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">1828 ms</span></div><div class="perf-call-body" id="perf1-call14-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call14-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call14-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;runwizv5.resul.io&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/AccountSetup/GetMasterData&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;application/json, text/plain, */*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;authorization&quot;: &quot;Bearer null&quot;,
+  &quot;content-length&quot;: &quot;2&quot;,
+  &quot;content-type&quot;: &quot;application/json&quot;,
+  &quot;origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/&quot;,
+  &quot;reqs&quot;: &quot;null&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;cross-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;,
+  &quot;x-forwarded-for&quot;: &quot;null&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call14-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call14-reqpayload-content" style="display:none;">{}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call14-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call14-response-content" style="display:none;">{
+  &quot;access-control-allow-credentials&quot;: &quot;true&quot;,
+  &quot;access-control-allow-methods&quot;: &quot;GET, POST, OPTIONS&quot;,
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;cf-cache-status&quot;: &quot;DYNAMIC&quot;,
+  &quot;cf-ray&quot;: &quot;a4e6f18119669c38-SIN&quot;,
+  &quot;content-encoding&quot;: &quot;br&quot;,
+  &quot;content-security-policy&quot;: &quot;default-src &#39;self&#39;;   style-src &#39;self&#39; &#39;unsafe-inline&#39;;   script-src &#39;self&#39;;   img-src &#39;self&#39; data:;   connect-src &#39;self&#39; https://run19.resul.io https://*.resul.io;   form-action &#39;self&#39; https://run19.resul.io https://*.resul.io   frame-ancestors &#39;self&#39;;&quot;,
+  &quot;content-type&quot;: &quot;text/plain; charset=utf-8&quot;,
+  &quot;date&quot;: &quot;Thu, 22 Oct 2026 07:56:05 GMT&quot;,
+  &quot;origin_request_header&quot;: &quot;*&quot;,
+  &quot;server&quot;: &quot;cloudflare&quot;,
+  &quot;strict-transport-security&quot;: &quot;max-age=15552000; includeSubDomains; preload&quot;,
+  &quot;vary&quot;: &quot;Accept-Encoding,Origin,Origin&quot;,
+  &quot;via&quot;: &quot;1.1 google&quot;,
+  &quot;x-content-type-options&quot;: &quot;nosniff&quot;,
+  &quot;x-frame-options&quot;: &quot;SAMEORIGIN&quot;,
+  &quot;x-xss-protection&quot;: &quot;1; mode=block&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call14-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call14-resppayload-content" style="display:none;">{&quot;brandPositionList&quot;:[{&quot;brandPositionID&quot;:1,&quot;brandPositionName&quot;:&quot;Luxury&quot;,&quot;clientType&quot;:2},{&quot;brandPositionID&quot;:2,&quot;brandPositionName&quot;:&quot;Premium&quot;,&quot;clientType&quot;:2},{&quot;brandPositionID&quot;:3,&quot;brandPositionName&quot;:&quot;Mass premium&quot;,&quot;clientType&quot;:2},{&quot;brandPositionID&quot;:4,&quot;brandPositionName&quot;:&quot;Low cost&quot;,&quot;clientType&quot;:2},{&quot;brandPositionID&quot;:5,&quot;brandPositionName&quot;:&quot;SME&quot;,&quot;clientType&quot;:1},{&quot;brandPositionID&quot;:6,&quot;brandPositionName&quot;:&quot;Mid-size&quot;,&quot;clientType&quot;:1},{&quot;brandPositionID&quot;:7,&quot;brandPositionName&quot;:&quot;Large enterprise&quot;,&quot;clientType&quot;:1},{&quot;brandPositionID&quot;:8,&quot;brandPositionName&quot;:&quot;Fortune 50&quot;,&quot;clientType&quot;:1},{&quot;brandPositionID&quot;:9,&quot;brandPositionName&quot;:&quot;Fortune 500&quot;,&quot;clientType&quot;:1},{&quot;brandPositionID&quot;:10,&quot;brandPositionName&quot;:&quot;Fortune 1000&quot;,&quot;clientType&quot;:1},{&quot;brandPositionID&quot;:11,&quot;brandPositionName&quot;:&quot;Private / Specialist&quot;,&quot;clientType&quot;:1},{&quot;brandPositionID&quot;:12,&quot;brandPositionName&quot;:&quot;FULL-service&quot;,&quot;clientType&quot;:1},{&quot;brandPositionID&quot;:13,&quot;brandPositionName&quot;:&quot;Mainstream&quot;,&quot;clientType&quot;:1},{&quot;brandPositionID&quot;:14,&quot;brandPositionName&quot;:&quot;VALUE&quot;,&quot;clientType&quot;:1},{&quot;brandPositionID&quot;:15,&quot;brandPositionName&quot;:&quot;MID-market&quot;,&quot;clientType&quot;:1},{&quot;brandPositionID&quot;:16,&quot;brandPositionName&quot;:&quot;SMB&quot;,&quot;clientType&quot;:1},{&quot;brandPositionID&quot;:17,&quot;brandPositionName&quot;:&quot;Enterprise&quot;,&quot;clientType&quot;:1}],&quot;jobFunctionList&quot;:[{&quot;jobFunctionID&quot;:1,&quot;jobFunctionName&quot;:&quot;Others&quot;},{&quot;jobFunctionID&quot;:2,&quot;jobFunctionName&quot;:&quot;Creative Services&quot;},{&quot;jobFunctionID&quot;:3,&quot;jobFunctionName&quot;:&quot;Director&quot;},{&quot;jobFunctionID&quot;:4,&quot;jobFunctionName&quot;:&quot;Finance Manager&quot;},{&quot;jobFunctionID&quot;:5,&quot;jobFunctionName&quot;:&quot;IT/Infrastructur...</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call15" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://runwizv5.resul.io/Home/LoginValidate</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">12954 ms</span></div><div class="perf-call-body" id="perf1-call15-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call15-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call15-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;runwizv5.resul.io&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/Home/LoginValidate&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;application/json, text/plain, */*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;authorization&quot;: &quot;Bearer null&quot;,
+  &quot;content-length&quot;: &quot;403&quot;,
+  &quot;content-type&quot;: &quot;application/json&quot;,
+  &quot;origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/&quot;,
+  &quot;reqs&quot;: &quot;null&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;cross-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;,
+  &quot;x-forwarded-for&quot;: &quot;null&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call15-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call15-reqpayload-content" style="display:none;">{
+  &quot;loginName&quot;: &quot;FHMTIBeHWyVGKbDERD5BbNt+Ofz+lxLPhkQnYQnkfNZvJolGkGHfsOgmMEcNnBp+&quot;,
+  &quot;loginPassword&quot;: &quot;MDZKitFgHCFxK6Tpy3gyOg==&quot;,
+  &quot;userAgent&quot;: &quot;Chrome&quot;,
+  &quot;ipAddress&quot;: &quot;MS4zOC45OS4xMDU=&quot;,
+  &quot;countryName&quot;: &quot;SW5kaWE=&quot;,
+  &quot;countryCode&quot;: &quot;SU4=&quot;,
+  &quot;rememberMe&quot;: false,
+  &quot;hashval&quot;: &quot;b3lUekVjJl1wdkdUKm1NZUZUaUghXA==&quot;,
+  &quot;attempts&quot;: 0,
+  &quot;lastURL&quot;: &quot;&quot;,
+  &quot;oauth&quot;: &quot;FHMTIBeHWyVGKbDERD5BbNt+Ofz+lxLPhkQnYQnkfNaPeGiQHbY4fRASIk+I3wrb&quot;,
+  &quot;IsADuser&quot;: false
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call15-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call15-response-content" style="display:none;">{
+  &quot;access-control-allow-credentials&quot;: &quot;true&quot;,
+  &quot;access-control-allow-methods&quot;: &quot;GET, POST, OPTIONS&quot;,
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;cf-cache-status&quot;: &quot;DYNAMIC&quot;,
+  &quot;cf-ray&quot;: &quot;a4e6f1c4a9389c38-SIN&quot;,
+  &quot;content-encoding&quot;: &quot;br&quot;,
+  &quot;content-security-policy&quot;: &quot;default-src &#39;self&#39;;   style-src &#39;self&#39; &#39;unsafe-inline&#39;;   script-src &#39;self&#39;;   img-src &#39;self&#39; data:;   connect-src &#39;self&#39; https://run19.resul.io https://*.resul.io;   form-action &#39;self&#39; https://run19.resul.io https://*.resul.io   frame-ancestors &#39;self&#39;;&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=utf-8&quot;,
+  &quot;date&quot;: &quot;Thu, 22 Oct 2026 07:56:18 GMT&quot;,
+  &quot;origin_request_header&quot;: &quot;*&quot;,
+  &quot;server&quot;: &quot;cloudflare&quot;,
+  &quot;strict-transport-security&quot;: &quot;max-age=15552000; includeSubDomains; preload&quot;,
+  &quot;vary&quot;: &quot;Accept-Encoding,Origin,Origin&quot;,
+  &quot;via&quot;: &quot;1.1 google&quot;,
+  &quot;x-content-type-options&quot;: &quot;nosniff&quot;,
+  &quot;x-frame-options&quot;: &quot;SAMEORIGIN&quot;,
+  &quot;x-xss-protection&quot;: &quot;1; mode=block&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call15-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call15-resppayload-content" style="display:none;">{&quot;status&quot;:true,&quot;statuscode&quot;:101,&quot;message&quot;:&quot;Login Success&quot;,&quot;data&quot;:{&quot;isCampaign&quot;:true,&quot;departmentList&quot;:[{&quot;departmentId&quot;:1,&quot;clientId&quot;:5249,&quot;departmentName&quot;:&quot;Automation Testing&quot;,&quot;brandId&quot;:null,&quot;brandName&quot;:null,&quot;uiprintableName&quot;:null,&quot;isRFA&quot;:false,&quot;isGenieEnabled&quot;:false},{&quot;departmentId&quot;:2,&quot;clientId&quot;:5249,&quot;departmentName&quot;:&quot;Manual QA&quot;,&quot;brandId&quot;:null,&quot;brandName&quot;:null,&quot;uiprintableName&quot;:null,&quot;isRFA&quot;:false,&quot;isGenieEnabled&quot;:false},{&quot;departmentId&quot;:3,&quot;clientId&quot;:5249,&quot;departmentName&quot;:&quot;Communication QA&quot;,&quot;brandId&quot;:null,&quot;brandName&quot;:null,&quot;uiprintableName&quot;:null,&quot;isRFA&quot;:false,&quot;isGenieEnabled&quot;:false},{&quot;departmentId&quot;:4,&quot;clientId&quot;:5249,&quot;departmentName&quot;:&quot;Aura 23&quot;,&quot;brandId&quot;:null,&quot;brandName&quot;:null,&quot;uiprintableName&quot;:null,&quot;isRFA&quot;:null,&quot;isGenieEnabled&quot;:null},{&quot;departmentId&quot;:0,&quot;clientId&quot;:5249,&quot;departmentName&quot;:&quot;All&quot;,&quot;brandId&quot;:null,&quot;brandName&quot;:null,&quot;uiprintableName&quot;:null,&quot;isRFA&quot;:null,&quot;isGenieEnabled&quot;:null}],&quot;accountAdmin&quot;:{&quot;clientId&quot;:5248,&quot;clientName&quot;:&quot;QA test one&quot;},&quot;clientList&quot;:[{&quot;clientId&quot;:5249,&quot;clientName&quot;:&quot;QA HQ main&quot;,&quot;logoPath&quot;:&quot;&quot;,&quot;tenantShortCode&quot;:null,&quot;isEnterprisePlus&quot;:true,&quot;statusId&quot;:3,&quot;hid&quot;:4,&quot;isDayLight&quot;:0,&quot;isAudEnabled&quot;:1,&quot;daylightSavingOffset&quot;:&quot;00:00&quot;}],&quot;permissionList&quot;:[{&quot;featureId&quot;:1,&quot;featureName&quot;:&quot;Dashboard&quot;,&quot;viewAccess&quot;:true,&quot;addAccess&quot;:false,&quot;updateAccess&quot;:false,&quot;deleteAccess&quot;:false},{&quot;featureId&quot;:47,&quot;featureName&quot;:&quot;Add Audience Via Manual upload, CSV, XML&quot;,&quot;viewAccess&quot;:true,&quot;addAccess&quot;:true,&quot;updateAccess&quot;:true,&quot;deleteAccess&quot;:false},{&quot;featureId&quot;:48,&quot;featureName&quot;:&quot;Add Audience Via remote dat...</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call16" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://run.resulticks.com/8MSB4Ly6gfJ0upbU7L-L14cBiO5mceVeWR615CeGTf-kS-xSE6U14NW1GiPBwBy8EgLo7qLY-0jpIjh2Bg4POH7YJExJaxNxGxyQWrBFoI8yubo9Ev8ubET1yONOwL_HL9CbiXYerDtuoXv4ffkS-dxrV8fKZf79dDc7HLG3jTe7u926i9q7eBs5jhtibm7Am72XT1BaSA8isX6mnahzh1BlWLMvWJrPowRNyZK2wRO59RdO_y8g1GBx23n4TYl5y3-p48B6K5AkuLffjgTiFYps81grkiERqiu6HO4DViH0CvHxpKtYdVEDe4OcmeFwN1EtJOn2aFHI0FVE156jaBzhvUjyupWGKngrfxIGIMrdg14idBmA3fhniJZl-TW6YPoke2tfvaw4HkIGtTPZWMQk-2-MRAbftwZ6E4Adac4gy4_f_RoqrQx36yniRtNRXm_UHCws0reaacfG4A</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">283 ms</span></div><div class="perf-call-body" id="perf1-call16-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call16-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call16-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;run.resulticks.com&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/8MSB4Ly6gfJ0upbU7L-L14cBiO5mceVeWR615CeGTf-kS-xSE6U14NW1GiPBwBy8EgLo7qLY-0jpIjh2Bg4POH7YJExJaxNxGxyQWrBFoI8yubo9Ev8ubET1yONOwL_HL9CbiXYerDtuoXv4ffkS-dxrV8fKZf79dDc7HLG3jTe7u926i9q7eBs5jhtibm7Am72XT1BaSA8isX6mnahzh1BlWLMvWJrPowRNyZK2wRO59RdO_y8g1GBx23n4TYl5y3-p48B6K5AkuLffjgTiFYps81grkiERqiu6HO4DViH0CvHxpKtYdVEDe4OcmeFwN1EtJOn2aFHI0FVE156jaBzhvUjyupWGKngrfxIGIMrdg14idBmA3fhniJZl-TW6YPoke2tfvaw4HkIGtTPZWMQk-2-MRAbftwZ6E4Adac4gy4_f_RoqrQx36yniRtNRXm_UHCws0reaacfG4A&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;*/*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;cache-control&quot;: &quot;max-age=0&quot;,
+  &quot;content-length&quot;: &quot;1728&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=UTF-8&quot;,
+  &quot;cookie&quot;: &quot;__cflb=0H28vSAvT6KU92EMv6Rh56mCL1GHbqJHUPSsdwGM6Vi&quot;,
+  &quot;origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/dashboard?q=U2FsdGVkX1%2F2intQee5TbXuWPp8lcdwjsw0OkK7NvU8%3D&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-origin&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call16-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call16-reqpayload-content" style="display:none;">{&quot;DOMIdentifiers&quot;:{&quot;rulesType&quot;:2,&quot;url&quot;:&quot;https://run.resulticks.com/dashboard?q=U2FsdGVkX1%2F2intQee5TbXuWPp8lcdwjsw0OkK7NvU8%3D&quot;,&quot;lang&quot;:&quot;en&quot;,&quot;ids&quot;:[&quot;a&quot;,&quot;list-shimmer&quot;],&quot;classes&quot;:[&quot;page-content-holder&quot;,&quot;dashboard-skeleton-scope&quot;,&quot;page-layout-skeleton--inline&quot;,&quot;db-sk-shell&quot;,&quot;db-sk-header&quot;,&quot;db-sk-header-left&quot;,&quot;mt-7&quot;,&quot;db-sk-block&quot;,&quot;db-sk-header-right&quot;,&quot;db-sk-breadcrumb&quot;,&quot;db-sk-shell-body&quot;,&quot;db-sk-tabs-wrap&quot;,&quot;db-sk-tabs&quot;,&quot;db-sk-tab&quot;,&quot;db-sk-tab--active&quot;,&quot;db-sk-tab-panel&quot;,&quot;db-sk-scope&quot;,&quot;db-sk-comm-tab&quot;,&quot;db-sk-row&quot;,&quot;db-sk-row--gauges&quot;,&quot;db-sk-col&quot;,&quot;db-sk-col--full&quot;,&quot;db-sk-comm-gauges&quot;,&quot;db-sk-gauges-toolbar&quot;,&quot;db-sk-gauges-row&quot;,&quot;db-sk-gauge-slot&quot;,&quot;db-sk-gauge-card&quot;,&quot;db-sk-gauge-card__title&quot;,&quot;db-sk-gauge-card__body&quot;,&quot;db-sk-gauge-card__left&quot;,&quot;db-sk-gauge-card__line&quot;,&quot;db-sk-gauge-card__line--short&quot;,&quot;db-sk-gauge-card__gauge&quot;,&quot;db-sk-gauge-card__arc&quot;,&quot;db-sk-gauge-card__footer&quot;,&quot;pr0&quot;,&quot;db-sk-gauge-card__date&quot;,&quot;db-sk-row--pair&quot;,&quot;db-sk-col--half&quot;,&quot;db-sk-portlet&quot;,&quot;db-sk-portlet--md&quot;,&quot;db-sk-portlet-header&quot;,&quot;db-sk-portlet-body&quot;,&quot;db-sk-column-chart&quot;,&quot;db-sk-column-chart__plot&quot;,&quot;db-sk-column-chart__bars&quot;,&quot;db-sk-column-chart__bar&quot;,&quot;db-sk-horizontal-bars&quot;,&quot;db-sk-horizontal-bars__bar&quot;,&quot;db-sk-bubble-chart&quot;,&quot;db-sk-bubble-chart__plot&quot;,&quot;db-sk-bubble-chart__plot-inner&quot;,&quot;db-sk-bubble-chart__bubble&quot;,&quot;db-sk-pie-chart-wrapper&quot;,&quot;db-sk-pie-chart&quot;,&quot;db-sk-pie-chart__circle&quot;,&quot;db-sk-pie-chart__legend&quot;,&quot;db-sk-pie-chart__legend-dot&quot;,&quot;db-sk-pie-chart__legend-text&quot;,&quot;db-sk-line-chart&quot;,&quot;mdm-sk-list-acquisition-skeleton&quot;,&quot;md...</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call16-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call16-response-content" style="display:none;">{
+  &quot;access-control-allow-origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;content-length&quot;: &quot;165&quot;,
+  &quot;content-type&quot;: &quot;application/octet-stream&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call16-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call16-resppayload-content" style="display:none;">y rpmagfwpcn]cavkmlq 8Y_. qgngavmpq 8lwnn. jkfg]qgngavmpq 8lwnn. ammikg]qgngavmpq 8lwnn. ammikg]jkfg]qgngavmpq 8lwnn. eglgpkajkfg 8dcnqg. ammikg]eglgpkajkfg 8dcnqg</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call17" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://run.resulticks.com/CsWdbdgAzf1hkGf1CStuF-m5UijmKswr0FKLBpRC3wT-vxCgSMcR75axgGs3gsihA_-DCm4p_SLuhm5ShjcUwlNdM2QY143R_LAiPai6yHq4Ma_gD01G5QDaHnFaLW4-y9dyc7DRjWzm00GnlX74eBugxjzifUbN48hLLh_86WepGpi4PhlYQ1Syddrbrypmlwu9zvFOfldsSTKyfVgUybGjPTkIq-RngFPmnV-mhF4cik2t3VYneLhh3wtQVhL-wqApcfoKnjXcLX-QkDVpZGKFOjMqleqG-DovfAxHSuWICGQwgyLmJO-4kyvQtRcOeFqmXBzZMZdzdnDOLt6mpUZdB7dz9vxul12iazSvzdrXWSRvWjWewaJe_M8S44Ro04dJrWnXUM7RpAVIubF9ubExv78l0he6lCakxrTnNk0mbdgDexFo5G0wgYC2QNC5ZxZvYDctOtVD7QzZWw</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">22 ms</span></div><div class="perf-call-body" id="perf1-call17-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call17-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call17-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;run.resulticks.com&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/CsWdbdgAzf1hkGf1CStuF-m5UijmKswr0FKLBpRC3wT-vxCgSMcR75axgGs3gsihA_-DCm4p_SLuhm5ShjcUwlNdM2QY143R_LAiPai6yHq4Ma_gD01G5QDaHnFaLW4-y9dyc7DRjWzm00GnlX74eBugxjzifUbN48hLLh_86WepGpi4PhlYQ1Syddrbrypmlwu9zvFOfldsSTKyfVgUybGjPTkIq-RngFPmnV-mhF4cik2t3VYneLhh3wtQVhL-wqApcfoKnjXcLX-QkDVpZGKFOjMqleqG-DovfAxHSuWICGQwgyLmJO-4kyvQtRcOeFqmXBzZMZdzdnDOLt6mpUZdB7dz9vxul12iazSvzdrXWSRvWjWewaJe_M8S44Ro04dJrWnXUM7RpAVIubF9ubExv78l0he6lCakxrTnNk0mbdgDexFo5G0wgYC2QNC5ZxZvYDctOtVD7QzZWw&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;*/*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;content-length&quot;: &quot;2&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=UTF-8&quot;,
+  &quot;cookie&quot;: &quot;__cflb=0H28vSAvT6KU92EMv6Rh56mCL1GHbqJHUPSsdwGM6Vi&quot;,
+  &quot;origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/dashboard?q=U2FsdGVkX1%2F2intQee5TbXuWPp8lcdwjsw0OkK7NvU8%3D&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-origin&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call17-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call17-reqpayload-content" style="display:none;">{}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call17-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call17-response-content" style="display:none;">{
+  &quot;access-control-allow-origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;content-length&quot;: &quot;34&quot;,
+  &quot;content-type&quot;: &quot;application/json&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call17-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call17-resppayload-content" style="display:none;">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;result&quot;: 0
+}</pre></div></div></div></div></div></div></div></div>
+<script>
+function togglePerfDetails(header) {
+    var detailsRow = document.getElementById(header.getAttribute('data-perf-id') + '-details');
+    if (!detailsRow) return;
+    var expandIcon = header.querySelector('.chevron');
+    if (detailsRow.style.display === 'none') {
+        detailsRow.style.display = 'block';
+        header.setAttribute('data-expanded', 'true');
+        if (expandIcon) { expandIcon.innerHTML = '&#9660;'; }
+    } else {
+        detailsRow.style.display = 'none';
+        header.setAttribute('data-expanded', 'false');
+        if (expandIcon) { expandIcon.innerHTML = '&#9654;'; }
+    }
+}
+function toggleApiCallDetails(header, event) {
+    if (event) event.stopPropagation();
+    var detailsRow = document.getElementById(header.getAttribute('data-call-id') + '-details');
+    if (!detailsRow) return;
+    var expandIcon = header.querySelector('.chevron');
+    if (detailsRow.style.display === 'none') {
+        detailsRow.style.display = 'block';
+        header.setAttribute('data-expanded', 'true');
+        if (expandIcon) { expandIcon.innerHTML = '&#9660;'; }
+    } else {
+        detailsRow.style.display = 'none';
+        header.setAttribute('data-expanded', 'false');
+        if (expandIcon) { expandIcon.innerHTML = '&#9654;'; }
+    }
+}
+function togglePerfTab(label, event) {
+    if (event) event.stopPropagation();
+    var content = document.getElementById(label.getAttribute('data-tab-id') + '-content');
+    if (!content) return;
+    var expandIcon = label.querySelector('.chevron');
+    if (content.style.display === 'none') {
+        content.style.display = 'block';
+        if (expandIcon) { expandIcon.innerHTML = '&#9660;'; }
+    } else {
+        content.style.display = 'none';
+        if (expandIcon) { expandIcon.innerHTML = '&#9654;'; }
+    }
+}
+document.addEventListener('DOMContentLoaded', function() {
+    var searchInput = document.getElementById('perfSearchInput');
+    if (!searchInput) return;
+    searchInput.addEventListener('input', function() {
+        var searchText = searchInput.value.toLowerCase().trim();
+        var cards = document.querySelectorAll('#perfList > .perf-card');
+        cards.forEach(function(card) {
+            var cardText = (card.getAttribute('data-search-text') || '').toLowerCase();
+            card.style.display = (!searchText || cardText.includes(searchText)) ? '' : 'none';
+        });
+    });
+});
+</script>
+        
+</div>
+
+<!-- ===== Lightbox Modal ===== -->
+<div class="modal" id="lightboxModal">
+    <span id="closeModal">&#x2716;</span>
+    <img class="modal-content" id="lightboxImage" style="display:none;"/>
+    <video class="modal-content" id="lightboxVideo" controls style="display:none;"></video>
+</div>
+
+<!-- Floating tooltip for the Last 7 circles (body-level so it isn't clipped by table overflow) -->
+<div id="miniTooltip"></div>
+
+<script>
+/* ===== Navigation ===== */
+function showDetailedReport(moduleFilter) {
+    document.getElementById("summary-section").style.display = "none";
+    document.getElementById("performance-section").style.display = "none";
+    document.getElementById("detailed-section").style.display = "block";
+    window.scrollTo(0, 0);
+
+    // Apply module filter if provided, otherwise show all rows
+    var mainRows = document.querySelectorAll('#testcaseTable > tbody > tr:not(.details-row)');
+    mainRows.forEach(function(row) {
+        var rowModule = (row.getAttribute('data-module') || '').toUpperCase().trim();
+        var filterModule = moduleFilter ? moduleFilter.toUpperCase().trim() : '';
+        var shouldShow = !filterModule || rowModule === filterModule;
+        var testId = row.getAttribute('data-test-id');
+        var detailsRow = document.getElementById(testId + '-details');
+        if (shouldShow) {
+            row.style.display = '';
+            if (detailsRow) {
+                var expanded = row.getAttribute('data-expanded') === 'true';
+                detailsRow.style.display = expanded ? 'table-row' : 'none';
+            }
+        } else {
+            row.style.display = 'none';
+            if (detailsRow) detailsRow.style.display = 'none';
+        }
+    });
+
+    // Reset the search/filter controls to reflect no active text/status filter
+    var searchInput = document.getElementById('searchInput');
+    var statusFilter = document.getElementById('statusFilter');
+    if (searchInput) searchInput.value = '';
+    if (statusFilter) statusFilter.value = '';
+}
+function showSummaryReport() {
+    document.getElementById("detailed-section").style.display = "none";
+    document.getElementById("performance-section").style.display = "none";
+    document.getElementById("summary-section").style.display = "block";
+    window.scrollTo(0, 0);
+}
+function showPerformanceReport() {
+    document.getElementById("summary-section").style.display = "none";
+    document.getElementById("detailed-section").style.display = "none";
+    document.getElementById("performance-section").style.display = "block";
+    window.scrollTo(0, 0);
+}
+
+/* ===== Doughnut Chart ===== */
+document.addEventListener('DOMContentLoaded', function() {
+    var ctx = document.getElementById('chart1');
+    if (ctx) {
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Passed', 'Failed', 'Skipped'],
+                datasets: [{
+                    data: [0, 1, 0],
+                    backgroundColor: ['#28a745', '#dc3545', '#ffc107']
+                }]
+            },
+            options: { plugins: { legend: { position: 'bottom' } } }
+        });
+    }
+    showSummaryReport();
+    populateModuleTable();
+});
+
+/* ===== Module Table ===== */
+var moduleDataRaw = "[{\"module\": \"TARGETLIST\", \"total\": 1, \"passed\": 0, \"failed\": 1, \"skipped\": 0, \"durationMillis\": 128017}]";
+var moduleData = [];
+try { moduleData = JSON.parse(moduleDataRaw); } catch (e) { console.error('Failed to parse module data:', e); }
+
+function formatDuration(ms) {
+    if (!ms || ms <= 0) return '-';
+    var totalSeconds = Math.floor(ms / 1000);
+    var hours = Math.floor(totalSeconds / 3600);
+    var minutes = Math.floor((totalSeconds % 3600) / 60);
+    var seconds = totalSeconds % 60;
+    var pad = function(n) { return n.toString().padStart(2, '0'); };
+    return pad(hours) + ':' + pad(minutes) + ':' + pad(seconds);
+}
+
+function populateModuleTable() {
+    var tableBody = document.getElementById('moduleTableBody');
+    if (!tableBody) return;
+
+    if (!moduleData || moduleData.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#666;">No module data available</td></tr>';
+        return;
+    }
+
+    tableBody.innerHTML = moduleData.map(function(m) {
+        var successRate = m.total > 0 ? ((m.passed / m.total) * 100).toFixed(0) : '0';
+        var slaRate = 90;
+        var modName = (m.module || 'Unknown Module');
+        return '<tr class="module-summary-row" data-filter-module="' + modName + '" style="cursor:pointer;">'
+            + '<td>' + modName + '</td>'
+            + '<td>' + (m.total || 0) + '</td>'
+            + '<td>' + (m.passed || 0) + '</td>'
+            + '<td>' + (m.failed || 0) + '</td>'
+            + '<td>' + (m.skipped || 0) + '</td>'
+            + '<td>' + formatDuration(m.durationMillis || 0) + '</td>'
+            + '<td class="' + (slaRate >= 90 ? 'sla-pass' : 'sla-fail') + '">' + slaRate + '%</td>'
+            + '<td class="' + (successRate >= slaRate ? 'sla-pass' : 'sla-fail') + '">' + successRate + '%</td>'
+            + '</tr>';
+    }).join('');
+
+    // Attach click handlers after rows are in the DOM (avoids all inline-JS quoting issues)
+    document.querySelectorAll('.module-summary-row').forEach(function(row) {
+        row.addEventListener('click', function() {
+            showDetailedReport(this.getAttribute('data-filter-module'));
+        });
+    });
+}
+
+/* ===== Floating tooltip for Last 7 circles =====
+   Lives at body level so it is never clipped by .table-container's overflow.
+   Uses document-level event delegation so it works for dynamically rendered rows. */
+(function() {
+    var tip = document.getElementById('miniTooltip');
+    if (!tip) return;
+
+    function positionTip(target) {
+        var rect = target.getBoundingClientRect();
+        var tipRect = tip.getBoundingClientRect();
+        var left = rect.left + (rect.width / 2) - (tipRect.width / 2);
+        var top = rect.top - tipRect.height - 10;
+        var margin = 6;
+        if (left < margin) left = margin;
+        if (left + tipRect.width > window.innerWidth - margin) {
+            left = window.innerWidth - tipRect.width - margin;
+        }
+        if (top < margin) {
+            // not enough room above — show below
+            top = rect.bottom + 10;
+        }
+        tip.style.left = left + 'px';
+        tip.style.top = top + 'px';
+    }
+
+    document.addEventListener('mouseover', function(e) {
+        // Use closest() rather than checking e.target directly: the mini-circle
+        // icons are now inline SVGs, so hovering the tick/cross/skip graphic
+        // makes e.target the inner <svg>/<path>/<circle>/<line>, not the
+        // .mini-circle span itself. closest() walks up to find the real
+        // tooltip-bearing element regardless of which inner node was hovered.
+        var el = e.target && e.target.closest ? e.target.closest('.mini-circle, .desc-chip-tip') : null;
+        if (!el) return;
+        var text = el.getAttribute('data-tooltip');
+        if (!text) return;
+        tip.textContent = text;
+        tip.style.left = '-9999px';
+        tip.style.top = '-9999px';
+        tip.classList.add('show');
+        requestAnimationFrame(function() { positionTip(el); });
+    });
+
+    document.addEventListener('mouseout', function(e) {
+        var el = e.target && e.target.closest ? e.target.closest('.mini-circle, .desc-chip-tip') : null;
+        if (!el) return;
+        // Don't hide the tooltip if the mouse simply moved to another child
+        // node still inside the same tooltip-bearing element (e.g. from the
+        // <svg> to an inner <path>).
+        var related = e.relatedTarget;
+        if (related && el.contains(related)) return;
+        tip.classList.remove('show');
+    });
+
+    window.addEventListener('scroll', function() {
+        tip.classList.remove('show');
+    }, true);
+})();
+
+/* ===== Lightbox (screenshot + video) ===== */
+document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('screenshot')) {
+        var modal = document.getElementById('lightboxModal');
+        var modalImg = document.getElementById('lightboxImage');
+        var modalVideo = document.getElementById('lightboxVideo');
+        if (modal && modalImg && modalVideo) {
+            modalVideo.style.display = 'none';
+            modalVideo.pause();
+            modalVideo.src = '';
+            modalImg.src = e.target.src;
+            modalImg.style.display = 'block';
+            modal.style.display = 'block';
+        }
+    }
+    if (e.target.id === 'closeModal' || e.target.classList.contains('modal')) {
+        var modal = document.getElementById('lightboxModal');
+        var modalVideo = document.getElementById('lightboxVideo');
+        if (modalVideo) { modalVideo.pause(); modalVideo.src = ''; }
+        if (modal) { modal.style.display = 'none'; }
+    }
+});
+</script>
+</body>
+</html>
