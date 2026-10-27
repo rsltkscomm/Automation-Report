@@ -1,0 +1,1483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Automation Test Summary Report</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+/* ===== Last 7 inline hand-drawn tick/cross icons ===== */
+.last7-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    width: 100%;
+}
+.mini-circle {
+    width: 23px;
+    height: 23px;
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    cursor: default;
+    transition: transform 0.15s ease;
+    /* "visiblePainted" (SVG default) only responds to hover on painted
+       pixels - fill:none strokes leave the middle of the icon "dead" to the
+       mouse. Forcing pointer-events:all on the whole icon area (including
+       its transparent bits) keeps the tooltip responsive everywhere inside
+       the 26x26 box, not just directly over a stroke line. */
+    pointer-events: all;
+}
+.mini-circle:hover {
+    transform: scale(1.25);
+    z-index: 20;
+}
+.mini-circle svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    pointer-events: all;
+}
+.mini-circle svg * {
+    pointer-events: all;
+}
+
+.th-last7 { text-align: center !important; }
+.td-last7 {
+    white-space: nowrap;
+    text-align: center;
+    overflow: visible !important;
+    padding: 8px 4px !important;
+    display: table-cell;
+    vertical-align: middle;
+}
+.last7-row {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 4px;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+}
+
+/* Hint pill telling the user the Last 7 Execution icons are hoverable.
+   Sits in the toolbar row, pushed to the far right via margin-left:auto
+   on the element itself, reusing the same soft-blue "chip" language as
+   .badge-pass / .desc-chip elsewhere in this report for visual consistency. */
+.last7-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: linear-gradient(90deg, #eff6ff, #e0ecff);
+    color: #1e40af;
+    border: 1px solid #bfdbfe;
+    padding: 8px 14px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    font-weight: 600;
+    letter-spacing: 0.1px;
+    white-space: nowrap;
+}
+.last7-hint-icon {
+    font-size: 1.1em;
+    line-height: 1;
+}
+
+/* Floating tooltip lives in <body> so it can't be clipped by .table-container overflow */
+#miniTooltip {
+    position: fixed;
+    background: #1e293b;
+    color: #fff;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-family: 'Segoe UI', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.1px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-width: 280px;
+    text-align: center;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    z-index: 99999;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+    line-height: 1.45;
+}
+#miniTooltip.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+#miniTooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 7px solid transparent;
+    border-top-color: #1e293b;
+}
+
+/* ===== General Layout ===== */
+body { font-family: 'Segoe UI', sans-serif; background:#f0f4fa; margin:0; color:#333; }
+.header { display:flex; justify-content:space-between; align-items:center; background:linear-gradient(33deg,#8db5f1,#021e49); color:white; padding:10px 20px; }
+.header img { height:40px; }
+.summary-band { background:#0e4494; color:white; display:flex; justify-content:center; gap:30px; padding:8px; font-weight:600; flex-wrap:wrap; }
+.summary-band div { display:flex; align-items:center; gap:5px; }
+.main { display:flex; gap:20px; padding:20px; flex-wrap:wrap; }
+.chart-container { flex:1; display:flex; justify-content:center; align-items:center; min-width:250px; }
+.table-container { flex:1; background:white; padding:15px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.1); overflow-x:hidden; box-sizing:border-box; min-width:300px; width:100%; }
+.table-container table { width:100%; border-collapse:collapse; }
+.table-container th, .table-container td { padding:8px; border-bottom:1px solid #eee; text-align:left; }
+.table-container th { background:#002b6b; color:white; }
+.table-container tbody tr { transition: background 0.15s; cursor: pointer; }
+.table-container tbody tr:hover { background: #eaf2ff !important; box-shadow: inset 3px 0 0 #1a6fd4; }
+.footer { text-align:center; font-size:0.8em; padding:10px; background:#f1f1f1; margin-top:20px; }
+.detailed-section { display: none; }
+
+/* ===== Detail Table ===== */
+#testcaseTable {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 1em;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 16px rgba(14,68,148,0.10);
+}
+#testcaseTable thead tr {
+    background: linear-gradient(90deg, #0e4494 0%, #1a6fd4 100%);
+}
+#testcaseTable thead th {
+    color: #fff;
+    font-weight: 700;
+    padding: 14px 10px;
+    text-align: left;
+    font-size: 0.88em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border: none;
+    white-space: nowrap;
+}
+#testcaseTable thead th.th-expand { width: 40px; text-align: center; }
+#testcaseTable tbody tr:not(.details-row) {
+    background: #fff;
+    transition: background 0.18s;
+    cursor: pointer;
+}
+#testcaseTable tbody tr:not(.details-row):nth-child(even) {
+    background: #f7f9fd;
+}
+#testcaseTable tbody tr:not(.details-row):hover {
+    background: #eaf2ff !important;
+}
+#testcaseTable tbody td {
+    padding: 12px 10px;
+    border-bottom: 1px solid #e8eef5;
+    vertical-align: middle;
+}
+.td-module { font-weight: 600; color: #1e293b; font-size: 0.98em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.td-tcid { font-family: 'Courier New', monospace; font-size: 0.94em; color: #2563eb; font-weight: 700; letter-spacing: 0.3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.td-desc { vertical-align: middle; }
+/* table-layout:fixed keeps each column at its assigned width.
+   The description cell wraps text inside its column so the row height is
+   driven only by the content of that run, not by neighbouring cells growing. */
+#testcaseTable tbody tr:not(.details-row) td {
+    box-sizing: border-box;
+    vertical-align: middle;
+}
+/* Only clip module and tcid columns — never the Last 7 column */
+#testcaseTable tbody td.td-module,
+#testcaseTable tbody td.td-tcid {
+    overflow: hidden;
+}
+.desc-chip {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    background: linear-gradient(90deg, #eff6ff, #e0ecff);
+    color: #1e40af;
+    border: 1px solid #bfdbfe;
+    border-radius: 6px;
+    padding: 7px 12px;
+    font-size: 0.91em;
+    font-weight: 600;
+    letter-spacing: 0.1px;
+    white-space: normal;
+    word-break: break-word;
+    overflow: hidden;
+    line-height: 1.5;
+    vertical-align: middle;
+    box-sizing: border-box;
+    width: 100%;
+    max-height: calc(2 * 1.5em + 14px);
+}
+.td-date { font-size: 0.92em; color: #475569; font-weight: 500; white-space: nowrap; }
+.td-dur { font-size: 0.91em; color: #64748b; white-space: nowrap; text-align: center; }
+
+/* ===== Status Badges ===== */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 14px;
+    border-radius: 20px;
+    font-size: 0.88em;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    white-space: nowrap;
+}
+.badge-pass { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+.badge-fail { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+.badge-skip { background: #fef9c3; color: #92400e; border: 1px solid #fde68a; }
+
+/* ===== Expand Chevron ===== */
+.expand-icon { text-align: center; width: 36px; }
+.chevron {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: #f1f5f9;
+    color: #666;
+    font-size: 10px;
+    transition: all 0.2s ease;
+    border: 1px solid #e2e8f0;
+}
+#testcaseTable tbody tr:hover .chevron {
+    background: #dbeafe;
+    color: #1d4ed8;
+    border-color: #93c5fd;
+}
+
+/* ===== Video Button ===== */
+.video-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: linear-gradient(90deg, #0e4494, #2563eb);
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 0.9em;
+    font-weight: 600;
+    text-decoration: none;
+    transition: opacity 0.15s, transform 0.15s;
+    box-shadow: 0 2px 6px rgba(14,68,148,0.25);
+}
+.video-btn:hover { opacity: 0.92; transform: translateY(-1px); }
+.video-btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px; height: 16px;
+    background: rgba(255,255,255,0.22);
+    border-radius: 50%;
+    font-size: 9px;
+    padding-left: 2px;
+    line-height: 1;
+}
+
+/* ===== Step Table ===== */
+.step-table { width:95%; margin:10px auto; border-collapse:collapse; font-size:0.85em; table-layout:fixed; border-radius:8px; overflow:hidden; }
+.step-table th, .step-table td { border:1px solid #e2e8f0; padding:9px 10px; text-align:left; word-wrap:break-word; overflow-wrap:break-word; }
+.step-table th { background: linear-gradient(90deg,#1e293b,#334155); color:#fff; font-size:0.82em; text-transform:uppercase; letter-spacing:0.5px; }
+.step-table tbody tr { transition: background 0.15s; }
+.step-table tbody tr:hover { background: #eaf2ff !important; }
+.step-table td:nth-child(1), .step-table th:nth-child(1) { width:30%; }
+.step-table td:nth-child(2), .step-table th:nth-child(2) { width:25%; }
+.step-table td:nth-child(3), .step-table th:nth-child(3) { width:25%; }
+.step-table td:nth-child(4), .step-table th:nth-child(4) { width:10%; text-align:center; }
+.step-table td:nth-child(5), .step-table th:nth-child(5) { width:10%; text-align:center; }
+.screenshot { max-width:80px; max-height:80px; object-fit:cover; cursor:pointer; border:1px solid #ccc; border-radius:4px; }
+.api-body-pre { background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:10px; font-size:12px; max-height:300px; overflow:auto; white-space:pre-wrap; word-break:break-word; }
+
+/* ===== Performance Report: scenario / call / tab accordion cards ===== */
+.perf-list { display:flex; flex-direction:column; gap:12px; padding:10px 0; }
+.perf-card { border:1px solid #e2e8f0; border-radius:10px; overflow:hidden; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,0.04); }
+.perf-card-header { display:flex; align-items:center; gap:14px; padding:14px 16px; cursor:pointer; background:#f8fafc; transition:background 0.15s; }
+.perf-card-header:hover { background:#eef2ff; }
+.perf-card-header .chevron { color:#0e4494; font-size:13px; flex-shrink:0; }
+.perf-card-meta { flex:1; min-width:0; }
+.perf-card-title { font-weight:700; color:#1e293b; font-size:0.95em; }
+.perf-tcid-chip { display:inline-block; margin-left:8px; padding:2px 8px; border-radius:12px; background:#e0e7ff; color:#3730a3; font-size:0.78em; font-weight:600; }
+.perf-card-desc { color:#64748b; font-size:0.85em; margin-top:2px; }
+.perf-card-stats { display:flex; align-items:center; gap:10px; flex-shrink:0; }
+.perf-calls-badge { background:#e2e8f0; color:#334155; padding:4px 10px; border-radius:12px; font-size:0.78em; font-weight:600; white-space:nowrap; }
+.perf-error-badge { background:#fdecea; color:#dc3545; padding:4px 10px; border-radius:12px; font-size:0.78em; font-weight:700; white-space:nowrap; }
+.perf-avg-badge { font-weight:700; font-size:0.9em; white-space:nowrap; }
+.perf-card-body { padding:12px 16px; background:#fff; border-top:1px solid #e2e8f0; display:flex; flex-direction:column; gap:8px; }
+.perf-call { border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; }
+.perf-call-error { border-color:#f5c2c7; }
+.perf-call-header { display:flex; align-items:center; gap:12px; padding:10px 12px; cursor:pointer; background:#fafafa; }
+.perf-call-header:hover { background:#f1f5f9; }
+.perf-call-header .chevron { color:#0e4494; font-size:12px; flex-shrink:0; }
+.perf-call-method { font-weight:700; font-size:0.8em; padding:2px 8px; border-radius:4px; background:#1e293b; color:#fff; flex-shrink:0; }
+.perf-call-url { flex:1; min-width:0; word-break:break-all; font-size:0.85em; color:#334155; }
+.perf-call-status { flex-shrink:0; font-size:0.85em; }
+.perf-call-time { flex-shrink:0; font-size:0.85em; color:#64748b; font-family:monospace; }
+.perf-call-body { padding:12px; background:#fff; border-top:1px solid #e2e8f0; }
+.perf-tabs { display:flex; flex-direction:column; gap:6px; }
+.perf-tab-label { cursor:pointer; padding:8px 10px; background:#f1f5f9; border-radius:6px; font-size:0.83em; font-weight:600; color:#334155; }
+.perf-tab-label:hover { background:#e2e8f0; }
+.perf-tab-content { margin-top:4px; }
+.environment-ribbon { background:#f4f6f8; padding:10px; font-size:0.9em; border-bottom:1px solid #ddd; display:flex; justify-content:space-around; flex-wrap:wrap; gap:8px; }
+.toolbar input, .toolbar select, .toolbar button { padding:6px 10px; border-radius:5px; border:1px solid #ccc; }
+.toolbar button { background:#007bff; color:white; border:none; cursor:pointer; }
+
+/* ===== Lightbox Modal ===== */
+.modal {
+    display: none; position: fixed; z-index: 9999;
+    padding-top: 60px; left: 0; top: 0;
+    width: 100%; height: 100%; overflow: auto;
+    background-color: rgba(0,0,0,0.9);
+}
+.modal-content { display:block; margin:auto; max-width:80%; max-height:80%; }
+video.modal-content { width:80%; background:black; }
+#closeModal {
+    position:absolute; top:20px; right:35px;
+    color:#fff; font-size:30px; font-weight:bold; cursor:pointer;
+}
+.chart-container canvas { max-width:300px !important; max-height:300px !important; }
+.detailed-report-link { text-align:right; padding:10px; display:block; }
+.detailed-report-link a { text-decoration:none; }
+.back-btn {
+    background: linear-gradient(90deg, #0e4494 0%, #1a6fd4 100%);
+    color: #fff;
+    padding: 10px 22px;
+    border-radius: 999px;
+    text-decoration: none;
+    box-shadow: 0 4px 14px rgba(14,68,148,0.30);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 14px 0;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.95em;
+    letter-spacing: 0.2px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+    border: none;
+}
+.back-btn:hover {
+    opacity: 0.95;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(14,68,148,0.36);
+}
+.back-btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.05em;
+    line-height: 1;
+}
+.status-pass { color:#28a745; font-weight:bold; }
+.status-fail { color:#dc3545; font-weight:bold; }
+.status-skipped { color:#ffc107; font-weight:bold; }
+.sla-pass { color:#28a745; font-weight:bold; }
+.sla-fail { color:#dc3545; font-weight:bold; }
+</style>
+</head>
+<body>
+
+<!-- ===== Summary Section ===== -->
+<div id="summary-section">
+    <div class="header">
+        <img alt="Company Logo" src="https://www.resulticks.com/images/logos/resulticks-logo-blue.svg"/>
+        <h2>Test Summary Report</h2>
+        <img alt="Product Logo" src="https://run.resulticks.com/assets/resulticks-logo-white-391eec89.svg"/>
+    </div>
+    <div class="summary-band">
+        <div>📊 Total: 2</div>
+        <div>✅ Passed: 0</div>
+        <div>❌ Failed: 2</div>
+        <div>⚠️ Skipped: 0</div>
+        <div>⏱️ Duration: 00:02:41</div>
+        <div>🎯 SLA: 90%</div>
+        <div>🎯 Pass Rate: 0.00%</div>
+    </div>
+    <div class="detailed-report-link">
+        <a class="back-btn" onclick="showDetailedReport()"><span class="back-btn-icon">&#8594;</span> Detailed Report</a>
+        <a class="back-btn" onclick="showPerformanceReport()"><span class="back-btn-icon">&#8594;</span> Performance Report</a>
+    </div>
+    <div class="main">
+        <div class="chart-container">
+            <canvas id="chart1"></canvas>
+        </div>
+        <div class="table-container">
+            <h3>Module-wise Results</h3>
+            <table>
+                <tr><th>Module</th><th>Total</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Duration</th><th>SLA %</th><th>Pass %</th></tr>
+                <tbody id="moduleTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+    <div class="footer">
+        Report generated on <span id="current-datetime">26-10-27 15:41:01</span> |
+        Contact: <a href="mailto:qaautomation@resulticks.com">qaautomation@resulticks.com</a>
+    </div>
+</div>
+
+<!-- ===== Detailed Section ===== -->
+<div id="detailed-section" class="detailed-section" style="padding:20px; box-sizing:border-box; width:100%;">
+    <div class="header"><img alt="Company Logo" src="https://www.resulticks.com/images/logos/resulticks-logo-blue.svg"/><h2>Detail Test Report</h2><img alt="Product Logo" src="https://run.resulticks.com/assets/resulticks-logo-white-391eec89.svg"/></div><div class="environment-ribbon"><span><strong>Environment:</strong> run</span><span><strong>Browser:</strong> chrome</span><span><strong>Release:</strong> 5.0</span><span><strong>Execution Date:</strong> 26-10-27 15:41:01</span></div><div style="text-align:right; padding:10px;"><a class="back-btn" onclick="showSummaryReport()"><span class="back-btn-icon">&#8592;</span> Back to Summary</a></div><div class="table-container"><h3>Test Case Results</h3><div class="toolbar"><div style="display:flex; gap:15px; flex-wrap:wrap; align-items:center; margin:20px 0;"><div><label><b>Search:</b></label><input id="searchInput" placeholder="Search test cases..." type="text"/></div><div><label><b>Filter by Status:</b></label><select id="statusFilter"><option value="">All</option><option value="PASS">Passed</option><option value="FAIL">Failed</option><option value="SKIPPED">Skipped</option></select></div><div class="last7-hint" style="margin-left:auto;"><span class="last7-hint-icon">&#9432;</span>Hover over the icons under <b>Last&nbsp;7&nbsp;Execution</b> to view the date &amp; result</div></div></div><table id="testcaseTable">
+<colgroup>
+  <col style="width:40px">
+  <col style="width:11%">
+  <col style="width:10%">
+  <col>
+  <col style="width:9%">
+  <col style="width:8%">
+  <col style="width:10%">
+  <col style="width:26%">
+</colgroup>
+<thead><tr>
+  <th class="th-expand"></th>
+  <th>Module</th>
+  <th>Test Case ID</th>
+  <th>Description</th>
+  <th style="text-align:center;">Status</th>
+  <th style="text-align:center;">Duration</th>
+  <th style="text-align:center;">Video</th>
+  <th class="th-last7">Last 7 Execution</th>
+</tr></thead><tbody><tr data-test-id="tc1" data-status="FAIL" data-expanded="false" data-module="AUDIENCE" data-testcaseid="RS-T1111111" data-rundate="26-10-27 1" data-duration="146s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">AUDIENCE</td><td class="td-tcid">RS-T1111111</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Upload audience using target list single excel file and verify sync history">Upload audience using target list single excel file and verify sync history</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">146s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T1111111_20261027101057780546_test_upload_audience_using_target_list_single_excel_file_and_verify_sync_history_20261027154056.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="No Execution Recorded"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8.3" fill="none" stroke="#f2a72e" stroke-width="3"/><line x1="6.1" y1="17.9" x2="17.9" y2="6.1" stroke="#f2a72e" stroke-width="3" stroke-linecap="round"/></svg></span><span class="mini-circle mini-skip" data-tooltip="No Execution Recorded"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8.3" fill="none" stroke="#f2a72e" stroke-width="3"/><line x1="6.1" y1="17.9" x2="17.9" y2="6.1" stroke="#f2a72e" stroke-width="3" stroke-linecap="round"/></svg></span><span class="mini-circle mini-skip" data-tooltip="No Execution Recorded"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8.3" fill="none" stroke="#f2a72e" stroke-width="3"/><line x1="6.1" y1="17.9" x2="17.9" y2="6.1" stroke="#f2a72e" stroke-width="3" stroke-linecap="round"/></svg></span><span class="mini-circle mini-skip" data-tooltip="No Execution Recorded"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8.3" fill="none" stroke="#f2a72e" stroke-width="3"/><line x1="6.1" y1="17.9" x2="17.9" y2="6.1" stroke="#f2a72e" stroke-width="3" stroke-linecap="round"/></svg></span><span class="mini-circle mini-skip" data-tooltip="No Execution Recorded"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8.3" fill="none" stroke="#f2a72e" stroke-width="3"/><line x1="6.1" y1="17.9" x2="17.9" y2="6.1" stroke="#f2a72e" stroke-width="3" stroke-linecap="round"/></svg></span><span class="mini-circle mini-fail" data-tooltip="Wed, 07 Oct 2026 - Fail"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M5.2 5.2 L18.8 18.8 M18.8 5.2 L5.2 18.8" stroke="#e4483f" stroke-width="3.2" stroke-linecap="round"/></svg></span><span class="mini-circle mini-fail" data-tooltip="Tue, 27 Oct 2026 - Fail"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M5.2 5.2 L18.8 18.8 M18.8 5.2 L5.2 18.8" stroke="#e4483f" stroke-width="3.2" stroke-linecap="round"/></svg></span></div></td></tr><tr class="details-row" id="tc1-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>the user logs in to the platform</td><td>User should log in to the platform successfully</td><td>User login failed RUN_5.0https://run.resulticks.com/.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1111111_20261027101020619020_RS-T1111111_20261027153953908489.jpg"/></td></tr><tr><td>Select business unit &#39;Automation Testing&#39;</td><td>Business unit should be selected successfully</td><td>Business unit &#39;Automation Testing&#39; not selected.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1111111_20261027101036935128_RS-T1111111_20261027154034772048.jpg"/></td></tr><tr><td>the user clicks Preferences Module</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T1111111_20261027101053165287_RS-T1111111_20261027154051240363.jpg"/></td></tr></table></td></tr><tr data-test-id="tc2" data-status="FAIL" data-expanded="false" data-module="AUDIENCE" data-testcaseid="RS-T111112" data-rundate="26-10-27 1" data-duration="144s" data-env="" onclick="toggleDetails(this)" style="cursor:pointer;"><td class="expand-icon"><span class="chevron">&#9654;</span></td><td class="td-module">AUDIENCE</td><td class="td-tcid">RS-T111112</td><td class="td-desc"><span class="desc-chip desc-chip-tip" data-tooltip="Upload audience using adhoc list single excel file and verify sync history">Upload audience using adhoc list single excel file and verify sync history</span></td><td style="text-align:center;"><span class="badge badge-fail">&#10007; Failed</span></td><td class="td-dur" style="text-align:center;">144s</td><td style="text-align:center;"><a href="#" class="play-video-btn" data-video="http://172.31.1.69:8000/media/videos/RS-T111112_20261027101055121373_test_upload_audience_using_adhoc_list_single_excel_file_and_verify_sync_history_20261027154053.webm" onclick="playVideoHandler(event, this)"><span class="video-btn"><span class="video-btn-icon">&#9654;</span> View</span></a></td><td class="td-last7"><div class="last7-row" onclick="event.stopPropagation()"><span class="mini-circle mini-skip" data-tooltip="No Execution Recorded"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8.3" fill="none" stroke="#f2a72e" stroke-width="3"/><line x1="6.1" y1="17.9" x2="17.9" y2="6.1" stroke="#f2a72e" stroke-width="3" stroke-linecap="round"/></svg></span><span class="mini-circle mini-skip" data-tooltip="No Execution Recorded"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8.3" fill="none" stroke="#f2a72e" stroke-width="3"/><line x1="6.1" y1="17.9" x2="17.9" y2="6.1" stroke="#f2a72e" stroke-width="3" stroke-linecap="round"/></svg></span><span class="mini-circle mini-skip" data-tooltip="No Execution Recorded"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8.3" fill="none" stroke="#f2a72e" stroke-width="3"/><line x1="6.1" y1="17.9" x2="17.9" y2="6.1" stroke="#f2a72e" stroke-width="3" stroke-linecap="round"/></svg></span><span class="mini-circle mini-skip" data-tooltip="No Execution Recorded"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8.3" fill="none" stroke="#f2a72e" stroke-width="3"/><line x1="6.1" y1="17.9" x2="17.9" y2="6.1" stroke="#f2a72e" stroke-width="3" stroke-linecap="round"/></svg></span><span class="mini-circle mini-skip" data-tooltip="No Execution Recorded"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8.3" fill="none" stroke="#f2a72e" stroke-width="3"/><line x1="6.1" y1="17.9" x2="17.9" y2="6.1" stroke="#f2a72e" stroke-width="3" stroke-linecap="round"/></svg></span><span class="mini-circle mini-skip" data-tooltip="No Execution Recorded"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8.3" fill="none" stroke="#f2a72e" stroke-width="3"/><line x1="6.1" y1="17.9" x2="17.9" y2="6.1" stroke="#f2a72e" stroke-width="3" stroke-linecap="round"/></svg></span><span class="mini-circle mini-fail" data-tooltip="Tue, 27 Oct 2026 - Fail"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M5.2 5.2 L18.8 18.8 M18.8 5.2 L5.2 18.8" stroke="#e4483f" stroke-width="3.2" stroke-linecap="round"/></svg></span></div></td></tr><tr class="details-row" id="tc2-details" style="display:none"><td colspan="8"><table class="step-table"><tr><th>Action</th><th>Expected Result</th><th>Actual Result</th><th>Status</th><th>Screenshot</th></tr><tr><td>the user logs in to the platform</td><td>User should log in to the platform successfully</td><td>User login failed RUN_5.0https://run.resulticks.com/.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T111112_20261027101019820166_RS-T111112_20261027153953963138.jpg"/></td></tr><tr><td>Select business unit &#39;&#39;</td><td>Business unit should be selected successfully</td><td>Business unit &#39;&#39; not selected.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T111112_20261027101035545041_RS-T111112_20261027154034009235.jpg"/></td></tr><tr><td>the user clicks Preferences Module</td><td></td><td>Locator.wait_for: Timeout 15000ms exceeded.</td><td>❌</td><td><img class="screenshot" src="http://172.31.1.69:8000/media/screenshots/RS-T111112_20261027101051265974_RS-T111112_20261027154049728975.jpg"/></td></tr></table></td></tr></tbody></table></div>
+<script>
+function toggleDetails(row) {
+    // row could be the <tr> itself (passed from onclick on the expand td)
+    if (!row || !row.getAttribute) return;
+    var detailsRow = document.getElementById(row.getAttribute('data-test-id') + '-details');
+    if (!detailsRow) return;
+    var expandIcon = row.querySelector('.expand-icon .chevron');
+    if (detailsRow.style.display === 'none') {
+        detailsRow.style.display = 'table-row';
+        row.setAttribute('data-expanded', 'true');
+        if (expandIcon) { expandIcon.innerHTML = '&#9660;'; expandIcon.style.color = '#0e4494'; }
+    } else {
+        detailsRow.style.display = 'none';
+        row.setAttribute('data-expanded', 'false');
+        if (expandIcon) { expandIcon.innerHTML = '&#9654;'; expandIcon.style.color = '#666'; }
+    }
+}
+
+function playVideoHandler(event, element) {
+    event.stopPropagation();
+    event.preventDefault();
+    var modal = document.getElementById('lightboxModal');
+    var modalImg = document.getElementById('lightboxImage');
+    var modalVideo = document.getElementById('lightboxVideo');
+    if (modal && modalImg && modalVideo) {
+        modalImg.style.display = 'none';
+        modalImg.src = '';
+        modalVideo.src = element.getAttribute('data-video');
+        modalVideo.style.display = 'block';
+        modal.style.display = 'block';
+        modalVideo.play();
+    }
+}
+
+function applySearchAndFilter() {
+    var searchText = document.getElementById('searchInput').value.toLowerCase().trim();
+    var filterValue = document.getElementById('statusFilter').value;
+    var mainRows = document.querySelectorAll('#testcaseTable > tbody > tr:not(.details-row)');
+    mainRows.forEach(function(row) {
+        var rowText = row.textContent.toLowerCase();
+        var rowStatus = row.getAttribute('data-status') || '';
+        var matchesSearch = !searchText || rowText.includes(searchText);
+        var matchesFilter = !filterValue || rowStatus === filterValue;
+        var shouldShow = matchesSearch && matchesFilter;
+        var testId = row.getAttribute('data-test-id');
+        var detailsRow = document.getElementById(testId + '-details');
+        if (shouldShow) {
+            row.style.display = '';
+            if (detailsRow) {
+                var expanded = row.getAttribute('data-expanded') === 'true';
+                detailsRow.style.display = expanded ? 'table-row' : 'none';
+            }
+        } else {
+            row.style.display = 'none';
+            if (detailsRow) detailsRow.style.display = 'none';
+            var ch = row.querySelector('.expand-icon .chevron');
+            if (ch) { ch.innerHTML = '&#9654;'; ch.style.color = '#666'; }
+            row.setAttribute('data-expanded', 'false');
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    var searchInput = document.getElementById('searchInput');
+    var statusFilter = document.getElementById('statusFilter');
+    if (searchInput) searchInput.addEventListener('input', applySearchAndFilter);
+    if (statusFilter) statusFilter.addEventListener('change', applySearchAndFilter);
+});
+</script>
+        
+</div>
+
+<!-- ===== Network Performance Section ===== -->
+<div id="performance-section" class="detailed-section" style="padding:20px; box-sizing:border-box; width:100%;">
+    <div class="header"><img alt="Company Logo" src="https://www.resulticks.com/images/logos/resulticks-logo-blue.svg"/><h2>Performance Report</h2><img alt="Product Logo" src="https://run.resulticks.com/assets/resulticks-logo-white-391eec89.svg"/></div><div class="environment-ribbon"><span><strong>Environment:</strong> run</span><span><strong>Browser:</strong> chrome</span><span><strong>Release:</strong> 5.0</span><span><strong>Execution Date:</strong> 26-10-27 15:41:01</span></div><div style="text-align:right; padding:10px;"><a class="back-btn" onclick="showSummaryReport()"><span class="back-btn-icon">&#8592;</span> Back to Summary</a></div><div class="table-container"><h3>Network Performance</h3><div class="toolbar"><div style="display:flex; gap:15px; flex-wrap:wrap; margin:20px 0;"><div><label><b>Search:</b></label><input id="perfSearchInput" placeholder="Search scenarios..." type="text"/></div></div></div><div id="perfList" class="perf-list"><div class="perf-card" data-search-text="AUDIENCE RS-T1111111 Upload audience using target list single excel file and verify sync history"><div class="perf-card-header" data-perf-id="perf1" data-expanded="false" onclick="togglePerfDetails(this)"><span class="chevron">&#9654;</span><div class="perf-card-meta"><div class="perf-card-title">AUDIENCE <span class="perf-tcid-chip">RS-T1111111</span></div><div class="perf-card-desc">Upload audience using target list single excel file and verify sync history</div></div><div class="perf-card-stats"><span class="perf-calls-badge">9 calls</span><span class="perf-avg-badge" style="color:#dc3545;">2931 ms avg</span></div></div><div class="perf-card-body" id="perf1-details" style="display:none;"><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call1" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">GET</span><span class="perf-call-url">https://run.resulticks.com/RD1dAIYB0RC315DyXgy46cnIu6crcIWNl6Vy6c92F6bFWxlol1_x2wuW1pYlh4q5nA4WKmD7V4GHe-gWA85MAyEAF0oPkfQDqyduAgBF9GU0s5aF4nl_kfK1e11xaB3AC_psMYTZJKqS6OEYyUsmD3bYJj2M0NJ2FAwZcyK-hiXLq5eNlDJsVTBdFx51lTywrxcJhXVNIvllymFqunJ_5OMDAJGAs60VS2-QZayP2MBqvEnIVBiRrdCtQuMbzkQvs31SjHbJVS4tLxPmy-A2hqqoLFfPsjQrMNSJ1qOgm4Apv5l0AZEyfmJWRZ3CKyTp2D7rKPmYbgy56jKbIZ-mVZTlofkiTU2qTngRAbODoYq-otKBhR131PhkuIQLeHDJBEIK4cHaDq9gYB4</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">1861 ms</span></div><div class="perf-call-body" id="perf1-call1-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call1-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call1-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;run.resulticks.com&quot;,
+  &quot;:method&quot;: &quot;GET&quot;,
+  &quot;:path&quot;: &quot;/RD1dAIYB0RC315DyXgy46cnIu6crcIWNl6Vy6c92F6bFWxlol1_x2wuW1pYlh4q5nA4WKmD7V4GHe-gWA85MAyEAF0oPkfQDqyduAgBF9GU0s5aF4nl_kfK1e11xaB3AC_psMYTZJKqS6OEYyUsmD3bYJj2M0NJ2FAwZcyK-hiXLq5eNlDJsVTBdFx51lTywrxcJhXVNIvllymFqunJ_5OMDAJGAs60VS2-QZayP2MBqvEnIVBiRrdCtQuMbzkQvs31SjHbJVS4tLxPmy-A2hqqoLFfPsjQrMNSJ1qOgm4Apv5l0AZEyfmJWRZ3CKyTp2D7rKPmYbgy56jKbIZ-mVZTlofkiTU2qTngRAbODoYq-otKBhR131PhkuIQLeHDJBEIK4cHaDq9gYB4&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;*/*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;cookie&quot;: &quot;__cflb=0H28vSAvT6KU92EMv6Rh56mCL1GHbqGvo41MRRfWzPW&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-origin&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call1-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call1-reqpayload-content" style="display:none;">-</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call1-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call1-response-content" style="display:none;">{
+  &quot;content-length&quot;: &quot;13987&quot;,
+  &quot;content-type&quot;: &quot;text/css&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call1-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call1-resppayload-content" style="display:none;">@font-face{font-family:Inter;font-style:normal;font-weight:400;src:url(&#39;/JWzajuX28tNnTQSI0g4ZS4wuQ2iOa-EZYx5XXV2ydQUJFM1faMBUfRYV4YtaQzn7WY4k8g34tlrMr1WNxnY5ZQ7DmJp86xiA0YPn7JookYxiePGvRRVnftoUnWDc-VxprK0z70zWbSuDQXPHvdGjvTqNb8v-TQ-es6cjKxFmwHAQlECRrB7oMReDH6HR57oJYuC2vNIaaUJkF9na51S6y85HHwKQIDcH9wILk00s4cuvtNj3sMbm1mw_KYzxnRVNnSjaxvPbK9Swr9j4-2vfrVpXtXwRVrNS1OXYUIuSEVfhvYuFgwSjemvnGysrmK18_NOCNNrH8GK0ouLXwie276q5zL4-jeDC6A1ikHCT7kf14K7zjpPUs70TW1jB5UtrMlewBFwFtm1fC8ObtGLMmHHudnNXGEKRqCbO4A4qlGk0u7ZwU1SRUZpNT2YrMD88Dm10WwypGJjJ8KXPcxC2Kgtrqdvanw&#39;) format(&quot;woff2&quot;);unicode-range:U+0460-052F,U+1C80-1C88,U+20B4,U+2DE0-2DFF,U+A640-A69F,U+FE2E-FE2F}@font-face{font-family:Inter;font-style:normal;font-weight:400;src:url(&#39;/BYKv71Yg7dDNcNZvs1Btf1z95fcHrr5Q1w6llF9a8gjs4B-e_mcsEQ_r-Fn8Z5z8BGct2QvOrOjr1Ga8e7u_MfXcpV96p0WYualcWDSOJ7mZBJbSBPhUwsE1sGPD3c82K6xlndEg6BtYTCn0KpYQXP4ABurcP_zqJMDGDfVMSkJbFQKUKQYAn9P-6IzzrZMR4D__9OlHajvRx_ueRjxObIfc2g3RTKh8rr4F6g0mUwgrpvRfE_E8pgM9fMdp3p2Hkiu7_BynF_YLtUZiu-u4taNsazNSwCl33Ezzfuxjkz7iSshR4xrkc2VJsw37-XVjOYEHmbCQHuZLMTHBZgn8Uiy-PUqBqBkABS4gcF10wTIIfnYxUXBjNa_9xg8KCDdTjBSW7erGRLC2jHUI7nT4w-HmErGV8AR4qACC6QopsQGXX-yTo6ZvwDUjUT-mNeFkMfAsqRhcHu-G5zB1viYXeQWCwqfW4A&#39;) format(&quot;woff2&quot;);unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}@font-face{font-family:Inter;font-style:normal;font-weight:400;src:url(&#39;/oJUkGV2vHfOBBq-NFHcqKCVg_tY5cQ4892z_4f_a0fouBy_hvZv-76ZwDhKr06JwpvOcq2L0Z2CEiOWRmeqZTfuL-sE39JQxHXKZtnpADyiloYnevKqIm3-7fM9aFuZe3dlsBbYHN7n...</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call2" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://run.resulticks.com/QKqQRJp8ujVmw8TBUMVPcweXp3_bEKUUmAb5ed8zhlpOZjrvtJU8Vg6Tnz2QjdFKRXHzlJBlgXTG51RCNwxs3omqsekLm4FcODF544MIbiOe-pgKuwdR2hKS0_vh_z6kw9YxUeBV7iT5eND1OTPU4-7EOvJSangD4Utb_SfM7Q-K8AILN86OFoZYgRbayghgxvsk_IqcCrY18bL86EW6LWxJU5lJ9eGmC_EsmNgsijaao7-c3z-6ed65B_mC8tcusOP0mdnp1Srka0BoaWdmnEOK6qSivoY3Tht05P02iAHgdmNp8dBVal9pYNGRvJoF9DrazC2Xje82465kj4wDx-3aaygTJhdxBneq136lNRM4WBLS-ihqTeRCHvImhdzhA63zzRI49cOjhxby9Z4vAf3sETQ5iw-TRgFr1MMY7hTC5jeAZAggY7-z6etbnDBYQYC5cUQCq382AiiMRg</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">5084 ms</span></div><div class="perf-call-body" id="perf1-call2-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call2-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call2-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;run.resulticks.com&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/QKqQRJp8ujVmw8TBUMVPcweXp3_bEKUUmAb5ed8zhlpOZjrvtJU8Vg6Tnz2QjdFKRXHzlJBlgXTG51RCNwxs3omqsekLm4FcODF544MIbiOe-pgKuwdR2hKS0_vh_z6kw9YxUeBV7iT5eND1OTPU4-7EOvJSangD4Utb_SfM7Q-K8AILN86OFoZYgRbayghgxvsk_IqcCrY18bL86EW6LWxJU5lJ9eGmC_EsmNgsijaao7-c3z-6ed65B_mC8tcusOP0mdnp1Srka0BoaWdmnEOK6qSivoY3Tht05P02iAHgdmNp8dBVal9pYNGRvJoF9DrazC2Xje82465kj4wDx-3aaygTJhdxBneq136lNRM4WBLS-ihqTeRCHvImhdzhA63zzRI49cOjhxby9Z4vAf3sETQ5iw-TRgFr1MMY7hTC5jeAZAggY7-z6etbnDBYQYC5cUQCq382AiiMRg&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;*/*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;cache-control&quot;: &quot;max-age=0&quot;,
+  &quot;content-length&quot;: &quot;120&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=UTF-8&quot;,
+  &quot;cookie&quot;: &quot;__cflb=0H28vSAvT6KU92EMv6Rh56mCL1GHbqGvo41MRRfWzPW&quot;,
+  &quot;origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-origin&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call2-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call2-reqpayload-content" style="display:none;">{
+  &quot;DOMIdentifiers&quot;: {
+    &quot;rulesType&quot;: 1,
+    &quot;url&quot;: &quot;https://run.resulticks.com/&quot;,
+    &quot;lang&quot;: &quot;en&quot;,
+    &quot;ids&quot;: [
+      &quot;_goober&quot;,
+      &quot;root&quot;
+    ],
+    &quot;classes&quot;: []
+  }
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call2-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call2-response-content" style="display:none;">{
+  &quot;access-control-allow-origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;content-length&quot;: &quot;27757&quot;,
+  &quot;content-type&quot;: &quot;application/octet-stream&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call2-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call2-resppayload-content" style="display:none;">-</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call3" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://run.resulticks.com/zcwkNSm6CbVpgJNkNrDwv5yTb9Nmqr2MyiDjWuSxuzea0V5652ZHlF5YNQbpQJJ1v0Q2mxzObsTkqrTQzStTJJRDwKC7NHRhvhALmV9pbMRqFRI3xvOSOIdhULe3cuCyxRw_e_jfgtWE2WxgqIhq8sIg2eYnFQeGp0V1FtghPNfd2UTrdnM6uGlFAVexGCbqFIYLR3qfFwSgf7w_Dlwrbupp25oYDFp24pUYTC95Yx1xTY8rx7JbyMhEGEl3vDZpSE0EKMAGvnleafrT13WjcNN2r3_SIvts0vy9qFmAXClcfPihunGXMp2Qf0jTsbccdT_jL9lmYAkRdieDkD6oN2rDcuaBmYgSmlvP8jCInG6wfNDtcUBwDNJLU8KR68t9GOpSLZGQyZXH7oI10qjRnEUleEnEQlqbSsg6yjQ_pkenlt3enUrhIfCLOn__uBQOJ5gdE5-KdXrGdUhxqw</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">5077 ms</span></div><div class="perf-call-body" id="perf1-call3-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call3-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call3-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;run.resulticks.com&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/zcwkNSm6CbVpgJNkNrDwv5yTb9Nmqr2MyiDjWuSxuzea0V5652ZHlF5YNQbpQJJ1v0Q2mxzObsTkqrTQzStTJJRDwKC7NHRhvhALmV9pbMRqFRI3xvOSOIdhULe3cuCyxRw_e_jfgtWE2WxgqIhq8sIg2eYnFQeGp0V1FtghPNfd2UTrdnM6uGlFAVexGCbqFIYLR3qfFwSgf7w_Dlwrbupp25oYDFp24pUYTC95Yx1xTY8rx7JbyMhEGEl3vDZpSE0EKMAGvnleafrT13WjcNN2r3_SIvts0vy9qFmAXClcfPihunGXMp2Qf0jTsbccdT_jL9lmYAkRdieDkD6oN2rDcuaBmYgSmlvP8jCInG6wfNDtcUBwDNJLU8KR68t9GOpSLZGQyZXH7oI10qjRnEUleEnEQlqbSsg6yjQ_pkenlt3enUrhIfCLOn__uBQOJ5gdE5-KdXrGdUhxqw&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;*/*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;content-length&quot;: &quot;0&quot;,
+  &quot;cookie&quot;: &quot;__cflb=0H28vSAvT6KU92EMv6Rh56mCL1GHbqGvo41MRRfWzPW&quot;,
+  &quot;origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-origin&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call3-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call3-reqpayload-content" style="display:none;">-</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call3-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call3-response-content" style="display:none;">{
+  &quot;access-control-allow-origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;content-length&quot;: &quot;71&quot;,
+  &quot;content-type&quot;: &quot;application/json&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call3-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call3-resppayload-content" style="display:none;">{
+  &quot;status&quot;: &quot;error&quot;,
+  &quot;errorMessage&quot;: &quot;internal error&quot;,
+  &quot;errorCode&quot;: 500
+}</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call4" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://run.resulticks.com/5AKefFD_6rWpEL-ptV2UQ1b640DAGiJvJanw_kKtXi_7yxIjEwPfjTCmi6WZMFwx1kKDHYq4oJDxxlvkNjZ-ikfa9EFgVs_3B8Aku9Y1H_fPYijBWPpRhkvDoMXDOrgkGq8nvFelTDM_tscQVmc6TPkzxthUe7qULLK4C-IkbNeA8pn99UM_F6t6p0uZEUFdRX0nEHvYl6bOaKHloSfOB-H7fYp-MQ64Zobixog-F6gD-YALbaP9Vth1ndWshiyQFktMzx1FG8mhRoV71inPXoIipmkEWIb7ZbtwdfqNrSHnOn0NcZXsVqEiVAIR420LXfPg8htHHuxZczZox2oi52-8zTwfMzjSRhMRd2TV3OuCGWhdc2M5A___zv_hzlKqG2VR2kpa7VWv37_8WJvqgFp0h6CtBGIzS8XAW3Cv2DtLMflTDitYEvTTywrlqN5KZH62DkaDohHTYBdinw</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">5105 ms</span></div><div class="perf-call-body" id="perf1-call4-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call4-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call4-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;run.resulticks.com&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/5AKefFD_6rWpEL-ptV2UQ1b640DAGiJvJanw_kKtXi_7yxIjEwPfjTCmi6WZMFwx1kKDHYq4oJDxxlvkNjZ-ikfa9EFgVs_3B8Aku9Y1H_fPYijBWPpRhkvDoMXDOrgkGq8nvFelTDM_tscQVmc6TPkzxthUe7qULLK4C-IkbNeA8pn99UM_F6t6p0uZEUFdRX0nEHvYl6bOaKHloSfOB-H7fYp-MQ64Zobixog-F6gD-YALbaP9Vth1ndWshiyQFktMzx1FG8mhRoV71inPXoIipmkEWIb7ZbtwdfqNrSHnOn0NcZXsVqEiVAIR420LXfPg8htHHuxZczZox2oi52-8zTwfMzjSRhMRd2TV3OuCGWhdc2M5A___zv_hzlKqG2VR2kpa7VWv37_8WJvqgFp0h6CtBGIzS8XAW3Cv2DtLMflTDitYEvTTywrlqN5KZH62DkaDohHTYBdinw&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;*/*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;content-length&quot;: &quot;2&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=UTF-8&quot;,
+  &quot;cookie&quot;: &quot;__cflb=0H28vSAvT6KU92EMv6Rh56mCL1GHbqGvo41MRRfWzPW&quot;,
+  &quot;origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-origin&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call4-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call4-reqpayload-content" style="display:none;">{}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call4-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call4-response-content" style="display:none;">{
+  &quot;access-control-allow-origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;content-length&quot;: &quot;34&quot;,
+  &quot;content-type&quot;: &quot;application/json&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call4-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call4-resppayload-content" style="display:none;">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;result&quot;: 0
+}</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call5" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://run.resulticks.com/QKqQRJp8ujVmw8TBUMVPcweXp3_bEKUUmAb5ed8zhlpOZjrvtJU8Vg6Tnz2QjdFKRXHzlJBlgXTG51RCNwxs3omqsekLm4FcODF544MIbiOe-pgKuwdR2hKS0_vh_z6kw9YxUeBV7iT5eND1OTPU4-7EOvJSangD4Utb_SfM7Q-K8AILN86OFoZYgRbayghgxvsk_IqcCrY18bL86EW6LWxJU5lJ9eGmC_EsmNgsijaao7-c3z-6ed65B_mC8tcusOP0mdnp1Srka0BoaWdmnEOK6qSivoY3Tht05P02iAHgdmNp8dBVal9pYNGRvJoF9DrazC2Xje82465kj4wDx-3aaygTJhdxBneq136lNRM4WBLS-ihqTeRCHvImhdzhA63zzRI49cOjhxby9Z4vAf3sETQ5iw-TRgFr1MMY7hTC5jeAZAggY7-z6etbnDBYQYC5cUQCq382AiiMRg</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">5357 ms</span></div><div class="perf-call-body" id="perf1-call5-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call5-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call5-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;run.resulticks.com&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/QKqQRJp8ujVmw8TBUMVPcweXp3_bEKUUmAb5ed8zhlpOZjrvtJU8Vg6Tnz2QjdFKRXHzlJBlgXTG51RCNwxs3omqsekLm4FcODF544MIbiOe-pgKuwdR2hKS0_vh_z6kw9YxUeBV7iT5eND1OTPU4-7EOvJSangD4Utb_SfM7Q-K8AILN86OFoZYgRbayghgxvsk_IqcCrY18bL86EW6LWxJU5lJ9eGmC_EsmNgsijaao7-c3z-6ed65B_mC8tcusOP0mdnp1Srka0BoaWdmnEOK6qSivoY3Tht05P02iAHgdmNp8dBVal9pYNGRvJoF9DrazC2Xje82465kj4wDx-3aaygTJhdxBneq136lNRM4WBLS-ihqTeRCHvImhdzhA63zzRI49cOjhxby9Z4vAf3sETQ5iw-TRgFr1MMY7hTC5jeAZAggY7-z6etbnDBYQYC5cUQCq382AiiMRg&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;*/*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;cache-control&quot;: &quot;max-age=0&quot;,
+  &quot;content-length&quot;: &quot;747&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=UTF-8&quot;,
+  &quot;cookie&quot;: &quot;__cflb=0H28vSAvT6KU92EMv6Rh56mCL1GHbqGvo41MRRfWzPW&quot;,
+  &quot;origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-origin&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call5-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call5-reqpayload-content" style="display:none;">{
+  &quot;DOMIdentifiers&quot;: {
+    &quot;rulesType&quot;: 2,
+    &quot;url&quot;: &quot;https://run.resulticks.com/&quot;,
+    &quot;lang&quot;: &quot;en&quot;,
+    &quot;ids&quot;: [
+      &quot;loading&quot;,
+      &quot;ecertificate&quot;
+    ],
+    &quot;classes&quot;: [
+      &quot;rs-page-content-wrapper-container&quot;,
+      &quot;login-route-loading&quot;,
+      &quot;rs-page-content-wrapper&quot;,
+      &quot;login-bg-img&quot;,
+      &quot;rsloading&quot;,
+      &quot;rsloading--login-route&quot;,
+      &quot;loading&quot;,
+      &quot;loading-content&quot;,
+      &quot;loading-tick&quot;,
+      &quot;login-content-area&quot;,
+      &quot;login&quot;,
+      &quot;rs-page-footer-wrapper&quot;,
+      &quot;position-relative&quot;,
+      &quot;container&quot;,
+      &quot;copyright&quot;,
+      &quot;list-group&quot;,
+      &quot;list-group-horizontal&quot;,
+      &quot;init-copyright&quot;,
+      &quot;rs-footer-pb-wrapper&quot;,
+      &quot;powered-by&quot;,
+      &quot;rs-tooltip-wrapper&quot;,
+      &quot;res-tooltip-wrapper&quot;,
+      &quot;lh0&quot;,
+      &quot;w-100&quot;,
+      &quot;tooltip-wrap&quot;,
+      &quot;rs-tooltip-child-wrapper&quot;,
+      &quot;res-tooltip-child-wrapper&quot;,
+      &quot;icon-rs-poweredby-medium&quot;,
+      &quot;icon-md&quot;,
+      &quot;position-absolute&quot;,
+      &quot;top-60&quot;,
+      &quot;right0&quot;,
+      &quot;g-0&quot;,
+      &quot;container-fluid&quot;,
+      &quot;footer-borders-container&quot;
+    ]
+  }
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call5-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call5-response-content" style="display:none;">{
+  &quot;access-control-allow-origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;content-length&quot;: &quot;275&quot;,
+  &quot;content-type&quot;: &quot;application/octet-stream&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call5-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call5-resppayload-content" style="display:none;">-</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call6" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://run.resulticks.com/QKqQRJp8ujVmw8TBUMVPcweXp3_bEKUUmAb5ed8zhlpOZjrvtJU8Vg6Tnz2QjdFKRXHzlJBlgXTG51RCNwxs3omqsekLm4FcODF544MIbiOe-pgKuwdR2hKS0_vh_z6kw9YxUeBV7iT5eND1OTPU4-7EOvJSangD4Utb_SfM7Q-K8AILN86OFoZYgRbayghgxvsk_IqcCrY18bL86EW6LWxJU5lJ9eGmC_EsmNgsijaao7-c3z-6ed65B_mC8tcusOP0mdnp1Srka0BoaWdmnEOK6qSivoY3Tht05P02iAHgdmNp8dBVal9pYNGRvJoF9DrazC2Xje82465kj4wDx-3aaygTJhdxBneq136lNRM4WBLS-ihqTeRCHvImhdzhA63zzRI49cOjhxby9Z4vAf3sETQ5iw-TRgFr1MMY7hTC5jeAZAggY7-z6etbnDBYQYC5cUQCq382AiiMRg</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">5 ms</span></div><div class="perf-call-body" id="perf1-call6-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call6-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call6-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;run.resulticks.com&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/QKqQRJp8ujVmw8TBUMVPcweXp3_bEKUUmAb5ed8zhlpOZjrvtJU8Vg6Tnz2QjdFKRXHzlJBlgXTG51RCNwxs3omqsekLm4FcODF544MIbiOe-pgKuwdR2hKS0_vh_z6kw9YxUeBV7iT5eND1OTPU4-7EOvJSangD4Utb_SfM7Q-K8AILN86OFoZYgRbayghgxvsk_IqcCrY18bL86EW6LWxJU5lJ9eGmC_EsmNgsijaao7-c3z-6ed65B_mC8tcusOP0mdnp1Srka0BoaWdmnEOK6qSivoY3Tht05P02iAHgdmNp8dBVal9pYNGRvJoF9DrazC2Xje82465kj4wDx-3aaygTJhdxBneq136lNRM4WBLS-ihqTeRCHvImhdzhA63zzRI49cOjhxby9Z4vAf3sETQ5iw-TRgFr1MMY7hTC5jeAZAggY7-z6etbnDBYQYC5cUQCq382AiiMRg&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;*/*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;cache-control&quot;: &quot;max-age=0&quot;,
+  &quot;content-length&quot;: &quot;2356&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=UTF-8&quot;,
+  &quot;cookie&quot;: &quot;__cflb=0H28vSAvT6KU92EMv6Rh56mCL1GHbqGvo41MRRfWzPW&quot;,
+  &quot;origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-origin&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call6-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call6-reqpayload-content" style="display:none;">{&quot;DOMIdentifiers&quot;:{&quot;rulesType&quot;:2,&quot;url&quot;:&quot;https://run.resulticks.com/&quot;,&quot;lang&quot;:&quot;en&quot;,&quot;ids&quot;:[&quot;emailId&quot;,&quot;rs_ExistingUser_password&quot;,&quot;_r_2_&quot;,&quot;rememberme&quot;,&quot;rs_ExistingUser_forgot&quot;,&quot;rs_ExistingUser_signin&quot;,&quot;rs_DisablePluginModal_proceed&quot;],&quot;classes&quot;:[&quot;brand-logo&quot;,&quot;emojifont&quot;,&quot;res-input-field-required&quot;,&quot;active&quot;,&quot;dropdown-item&quot;,&quot;rs-bootstrap-dropdown-menu&quot;,&quot;dropdown-menu&quot;,&quot;login-container&quot;,&quot;rs-homepage-alert-wrapper&quot;,&quot;login-resul-logo&quot;,&quot;mt25&quot;,&quot;login-info-container&quot;,&quot;mx0&quot;,&quot;row&quot;,&quot;tabBlock&quot;,&quot;px0&quot;,&quot;col&quot;,&quot;loginTabs&quot;,&quot;loginTabs-container&quot;,&quot;rs-chart-tab&quot;,&quot;pointer-event-none&quot;,&quot;mini&quot;,&quot;mb0&quot;,&quot;tabDefault&quot;,&quot;single-tab&quot;,&quot;d-block&quot;,&quot;tab-label&quot;,&quot;login-cont&quot;,&quot;login-cont--loadable&quot;,&quot;tabs-content&quot;,&quot;d-flex&quot;,&quot;rs-login-wrapper&quot;,&quot;login-panel&quot;,&quot;form-group&quot;,&quot;col-md-6&quot;,&quot;rs-bootstrap-dropdown&quot;,&quot;rs-bootstrap-dropdown-with-icon&quot;,&quot;login-existing-user-dropdown&quot;,&quot;rs-dropdown&quot;,&quot;1&quot;,&quot;dropdown&quot;,&quot;dropdown-toggle&quot;,&quot;btn&quot;,&quot;css-scrollbar&quot;,&quot;custome-dropdown-scroll&quot;,&quot;v1-dropdown-data&quot;,&quot;res-input-wrapper&quot;,&quot;res-input-placeholder-wrapper&quot;,&quot;res-input-icon-placeholder&quot;,&quot;res-input-field&quot;,&quot;res-input-wrapper-required&quot;,&quot;res-input-label-text&quot;,&quot;res-input-label-required&quot;,&quot;res-input-border-bottom-required&quot;,&quot;res-input-icon-wrapper&quot;,&quot;res-login-email-status-icon&quot;,&quot;res-login-email-status-icon--email&quot;,&quot;res-login-email-status-icon__svg&quot;,&quot;res-login-email-status-icon__email&quot;,&quot;res-login-email-status-icon__email-line&quot;,&quot;res-login-email-status-icon__email-box&quot;,&quot;res-login-email-status-icon__email-flap&quot;,&quot;res-login-email-status-icon__email-fold&quot;,&quot;res-login...</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call6-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call6-response-content" style="display:none;">{
+  &quot;access-control-allow-origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;content-length&quot;: &quot;334&quot;,
+  &quot;content-type&quot;: &quot;application/octet-stream&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call6-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call6-resppayload-content" style="display:none;">-</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call7" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">GET</span><span class="perf-call-url">https://geolocation-db.com/json/</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">1213 ms</span></div><div class="perf-call-body" id="perf1-call7-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call7-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call7-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;geolocation-db.com&quot;,
+  &quot;:method&quot;: &quot;GET&quot;,
+  &quot;:path&quot;: &quot;/json/&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;application/json, text/plain, */*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;cross-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call7-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call7-reqpayload-content" style="display:none;">-</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call7-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call7-response-content" style="display:none;">{
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;content-encoding&quot;: &quot;gzip&quot;,
+  &quot;content-type&quot;: &quot;text/html; charset=UTF-8&quot;,
+  &quot;date&quot;: &quot;Tue, 27 Oct 2026 10:10:18 GMT&quot;,
+  &quot;server&quot;: &quot;nginx/1.14.0 (Ubuntu)&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call7-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call7-resppayload-content" style="display:none;">{
+  &quot;country_code&quot;: &quot;IN&quot;,
+  &quot;country_name&quot;: &quot;India&quot;,
+  &quot;city&quot;: null,
+  &quot;postal&quot;: null,
+  &quot;latitude&quot;: 20,
+  &quot;longitude&quot;: 77,
+  &quot;IPv4&quot;: &quot;116.212.183.147&quot;,
+  &quot;state&quot;: null
+}</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call8" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://run.resulticks.com/5AKefFD_6rWpEL-ptV2UQ1b640DAGiJvJanw_kKtXi_7yxIjEwPfjTCmi6WZMFwx1kKDHYq4oJDxxlvkNjZ-ikfa9EFgVs_3B8Aku9Y1H_fPYijBWPpRhkvDoMXDOrgkGq8nvFelTDM_tscQVmc6TPkzxthUe7qULLK4C-IkbNeA8pn99UM_F6t6p0uZEUFdRX0nEHvYl6bOaKHloSfOB-H7fYp-MQ64Zobixog-F6gD-YALbaP9Vth1ndWshiyQFktMzx1FG8mhRoV71inPXoIipmkEWIb7ZbtwdfqNrSHnOn0NcZXsVqEiVAIR420LXfPg8htHHuxZczZox2oi52-8zTwfMzjSRhMRd2TV3OuCGWhdc2M5A___zv_hzlKqG2VR2kpa7VWv37_8WJvqgFp0h6CtBGIzS8XAW3Cv2DtLMflTDitYEvTTywrlqN5KZH62DkaDohHTYBdinw</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">4 ms</span></div><div class="perf-call-body" id="perf1-call8-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call8-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call8-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;run.resulticks.com&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/5AKefFD_6rWpEL-ptV2UQ1b640DAGiJvJanw_kKtXi_7yxIjEwPfjTCmi6WZMFwx1kKDHYq4oJDxxlvkNjZ-ikfa9EFgVs_3B8Aku9Y1H_fPYijBWPpRhkvDoMXDOrgkGq8nvFelTDM_tscQVmc6TPkzxthUe7qULLK4C-IkbNeA8pn99UM_F6t6p0uZEUFdRX0nEHvYl6bOaKHloSfOB-H7fYp-MQ64Zobixog-F6gD-YALbaP9Vth1ndWshiyQFktMzx1FG8mhRoV71inPXoIipmkEWIb7ZbtwdfqNrSHnOn0NcZXsVqEiVAIR420LXfPg8htHHuxZczZox2oi52-8zTwfMzjSRhMRd2TV3OuCGWhdc2M5A___zv_hzlKqG2VR2kpa7VWv37_8WJvqgFp0h6CtBGIzS8XAW3Cv2DtLMflTDitYEvTTywrlqN5KZH62DkaDohHTYBdinw&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;*/*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;content-length&quot;: &quot;2&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=UTF-8&quot;,
+  &quot;cookie&quot;: &quot;__cflb=0H28vSAvT6KU92EMv6Rh56mCL1GHbqGvo41MRRfWzPW&quot;,
+  &quot;origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-origin&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call8-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call8-reqpayload-content" style="display:none;">{}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call8-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call8-response-content" style="display:none;">{
+  &quot;access-control-allow-origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;content-length&quot;: &quot;34&quot;,
+  &quot;content-type&quot;: &quot;application/json&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call8-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call8-resppayload-content" style="display:none;">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;result&quot;: 0
+}</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf1-call9" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://runwiz.resul.io/AccountSetup/GetIPData</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 201</span><span class="perf-call-time">2671 ms</span></div><div class="perf-call-body" id="perf1-call9-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call9-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call9-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;runwiz.resul.io&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/AccountSetup/GetIPData&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;application/json, text/plain, */*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;authorization&quot;: &quot;Bearer null&quot;,
+  &quot;content-length&quot;: &quot;31&quot;,
+  &quot;content-type&quot;: &quot;application/json&quot;,
+  &quot;origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/&quot;,
+  &quot;reqs&quot;: &quot;null&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;cross-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;,
+  &quot;x-forwarded-for&quot;: &quot;null&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call9-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call9-reqpayload-content" style="display:none;">{
+  &quot;ipaddress&quot;: &quot;116.212.183.147&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call9-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf1-call9-response-content" style="display:none;">{
+  &quot;access-control-allow-credentials&quot;: &quot;true&quot;,
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;content-encoding&quot;: &quot;br&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=utf-8&quot;,
+  &quot;date&quot;: &quot;Tue, 27 Oct 2026 10:10:20 GMT&quot;,
+  &quot;server&quot;: &quot;Kestrel&quot;,
+  &quot;strict-transport-security&quot;: &quot;max-age=31536000; includeSubDomains&quot;,
+  &quot;vary&quot;: &quot;Accept-Encoding,Origin,Origin&quot;,
+  &quot;via&quot;: &quot;1.1 google&quot;,
+  &quot;x-content-type-options&quot;: &quot;nosniff&quot;,
+  &quot;x-frame-options&quot;: &quot;SAMEORIGIN&quot;,
+  &quot;x-xss-protection&quot;: &quot;1; mode=block&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf1-call9-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf1-call9-resppayload-content" style="display:none;">{
+  &quot;status&quot;: true,
+  &quot;message&quot;: &quot;Successfull&quot;,
+  &quot;data&quot;: {
+    &quot;latitude&quot;: &quot;13.0895&quot;,
+    &quot;longitude&quot;: &quot;80.2739&quot;,
+    &quot;country&quot;: &quot;India&quot;,
+    &quot;countryCode&quot;: &quot;IN&quot;,
+    &quot;city&quot;: &quot;Chennai&quot;,
+    &quot;location&quot;: &quot;TN&quot;,
+    &quot;istCode&quot;: &quot;91&quot;,
+    &quot;countryID&quot;: 3,
+    &quot;currencyID&quot;: 1,
+    &quot;defaultLanguageID&quot;: 1,
+    &quot;defaultDateformatID&quot;: 2,
+    &quot;defaultTimeFormatID&quot;: 0,
+    &quot;defaultTimeZoneID&quot;: 64
+  }
+}</pre></div></div></div></div></div></div><div class="perf-card" data-search-text="AUDIENCE RS-T111112 Upload audience using adhoc list single excel file and verify sync history"><div class="perf-card-header" data-perf-id="perf2" data-expanded="false" onclick="togglePerfDetails(this)"><span class="chevron">&#9654;</span><div class="perf-card-meta"><div class="perf-card-title">AUDIENCE <span class="perf-tcid-chip">RS-T111112</span></div><div class="perf-card-desc">Upload audience using adhoc list single excel file and verify sync history</div></div><div class="perf-card-stats"><span class="perf-calls-badge">9 calls</span><span class="perf-avg-badge" style="color:#dc3545;">3895 ms avg</span></div></div><div class="perf-card-body" id="perf2-details" style="display:none;"><div class="perf-call"><div class="perf-call-header" data-call-id="perf2-call1" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">GET</span><span class="perf-call-url">https://run.resulticks.com/u208sBIMxJmaaA2IFvNfZoFksmAFB60UPnaNXOzQOTHwJaw1-IMXFzFOL5anGFFENDwzCpMpV6mmTyTnMFFI1WwGMEvV5EKw6ZTPQUaTNWYze26J5D4h9ASbBpPnSDZvG9VPUqViJfizYXmyce8wZ64057I0U50cL2yFTAZCBKAyZ_NHMRXwqcp0ipv-IzOFmGD8CO3uT62oRR7p4mcDz6tNifcz_bL3KZaITuO5mi_6fqcWIkJSNeyfmfGFfc6Wd7cBikbvtBs3-b25dlpcOtxd4B7MfC91iMwk6FhY-w8qTc9VbaKwLSQGQxuwONZvbQj4cCGx1F3RuRtSsf9AP1-qQWAXFZp5MdlioGkOP5ZkWgPFQsH8QRThVowdoEeAdfZBAfb8qf5rxm0</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">11 ms</span></div><div class="perf-call-body" id="perf2-call1-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call1-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf2-call1-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;run.resulticks.com&quot;,
+  &quot;:method&quot;: &quot;GET&quot;,
+  &quot;:path&quot;: &quot;/u208sBIMxJmaaA2IFvNfZoFksmAFB60UPnaNXOzQOTHwJaw1-IMXFzFOL5anGFFENDwzCpMpV6mmTyTnMFFI1WwGMEvV5EKw6ZTPQUaTNWYze26J5D4h9ASbBpPnSDZvG9VPUqViJfizYXmyce8wZ64057I0U50cL2yFTAZCBKAyZ_NHMRXwqcp0ipv-IzOFmGD8CO3uT62oRR7p4mcDz6tNifcz_bL3KZaITuO5mi_6fqcWIkJSNeyfmfGFfc6Wd7cBikbvtBs3-b25dlpcOtxd4B7MfC91iMwk6FhY-w8qTc9VbaKwLSQGQxuwONZvbQj4cCGx1F3RuRtSsf9AP1-qQWAXFZp5MdlioGkOP5ZkWgPFQsH8QRThVowdoEeAdfZBAfb8qf5rxm0&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;*/*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;cookie&quot;: &quot;__cflb=0H28vSAvT6KU92EMv6Rh56mCL1GHbqGwXsXYz5Hnesv&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-origin&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call1-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf2-call1-reqpayload-content" style="display:none;">-</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call1-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf2-call1-response-content" style="display:none;">{
+  &quot;content-length&quot;: &quot;13987&quot;,
+  &quot;content-type&quot;: &quot;text/css&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call1-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf2-call1-resppayload-content" style="display:none;">@font-face{font-family:Inter;font-style:normal;font-weight:400;src:url(&#39;/v9R3YPvyeXm2yhPTdEkPfMzleHtgGuUp4rJDueCqJlh6jKOW4FVSIjXge7pvJmuw0xxrL_xr5Orp3JGh1SwtPIXQLRLc2-hPiZmglpTdYrtyAbF9BWU-kVDAMpPcNd746d_CDmoMMJbv41yZ47ugvhYfXzJEDFjdyiRCogVJT7EAJ0Dt-lfJXCp-v3VGjQ9hb-exLOIFWXucDIXOFs8V0TKd-BSvDPEaruPKfDCSSZgcwDhtdnCA_-j09ITovB9NlB4w6-wb712y84XQurORSfuz5NcQH25YGLa78bHliJ076v1gE__gfSGHvV29mdX5DaVSQ6fiOZ-a0DRQxSu2mxPDxSYS8-8vFMA6EjL0_TiMAEukldGrkPf_1SR7PsHeuy0bMLYl8PZYiRcFpOb9kj-lQ29_NrW5bOhLCAXBpv9DnL3GLKwAC_z67KjWMRKEdWf_o4fVahYonNXcewa60Y0VG5DHKA&#39;) format(&quot;woff2&quot;);unicode-range:U+0460-052F,U+1C80-1C88,U+20B4,U+2DE0-2DFF,U+A640-A69F,U+FE2E-FE2F}@font-face{font-family:Inter;font-style:normal;font-weight:400;src:url(&#39;/h4fe-otsHitTkBHZyMV3suqrpj-V6isz_1kgrgvU4pCfFg-HKCZm09klPPSAr39_EYBix0QazSONvK4jcgx2z8Wn3nskJUXeaegZn0aUMNP99svs8yD1q1LIs6o8MIlXDQGFA_CVyH6_NbQXKWq9LJQjziwodgVXjSYULKtHRTouE5vWX4d1u9NWqNzwFaUEYrHiGzdsAAz8f6_71SQ7QF8CH9j1FS3fxpIl6sYnDlSNmDaxPmQfpby5nT1voo1ZA3dmuE3G43HwW70xa_VDDbuEkJKnifjwdtDiMjuGd9QVplRoZSOfOQI5x8KDsk8-65Wz_LSC5ZkNB1w1lemxrE-HhRSKRAF158jidvX2gCJi_wyPDxShLjKgoGg5kvQFJfN5JqXjgv-qhUF70AjCYJVhuimLwVw5vhhoRzBWaRB9dB_M9QDWUO59GV5Hh755gCXnZw3l0U1agMIsR_psLm5vhSQsUg&#39;) format(&quot;woff2&quot;);unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}@font-face{font-family:Inter;font-style:normal;font-weight:400;src:url(&#39;/8-hJGjET5SYKnVh3UUr_eT33mgWnuPJW17vLYyhSBUfYp2Rz0TWK8LZ19JHXX622-eYbhvM3_j4llmPDJmiFtWvt-KVD9St-TzjxoysUqmfAa_KaI5Cpc_co4sJ-wxMVcFNc4FJh_s6...</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf2-call2" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://run.resulticks.com/y7A9aoZLq_ccy_wCSH_duohUngKzEFGTnuLBaJrUoh1YtyfUdE2u9duh1T02pWr8Bw_-7A3gQkFKlZt0YxeBjBW94gnWSJrEkiyjEp4Ogu4-6NePifQcifxIP3gbhWrZJ8l-iUJbCfjmS2BSlVG190yAHpQfJbe3JhKayLt0wlYqpKzt3lr2ZK1Pkgch4lBtTAS1rW6GicEVyxnuVWDzsweWcM0zJcyABNhCqB4zh6-snTWFsD69mkuXrMW0citnjo2CzWUUYIJDTqnEzwNq1m9guIQCVzuUGirJRFpkEVoEKeKZBV1RLDYCNfMCLQp3IYXiftKNAPQFhNALpx5czG8xaSWK046XW1BkHHib_HzmA2XsJZX8O3S8msT6tU8O1fTNi3ifFyd8kGbMQW3kk89Qgth-jn8rtlAs5RtzMaqgT6hbFl2V4efVelWsM2QDV5paHVfJtUVLTBGspA</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">5130 ms</span></div><div class="perf-call-body" id="perf2-call2-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call2-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf2-call2-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;run.resulticks.com&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/y7A9aoZLq_ccy_wCSH_duohUngKzEFGTnuLBaJrUoh1YtyfUdE2u9duh1T02pWr8Bw_-7A3gQkFKlZt0YxeBjBW94gnWSJrEkiyjEp4Ogu4-6NePifQcifxIP3gbhWrZJ8l-iUJbCfjmS2BSlVG190yAHpQfJbe3JhKayLt0wlYqpKzt3lr2ZK1Pkgch4lBtTAS1rW6GicEVyxnuVWDzsweWcM0zJcyABNhCqB4zh6-snTWFsD69mkuXrMW0citnjo2CzWUUYIJDTqnEzwNq1m9guIQCVzuUGirJRFpkEVoEKeKZBV1RLDYCNfMCLQp3IYXiftKNAPQFhNALpx5czG8xaSWK046XW1BkHHib_HzmA2XsJZX8O3S8msT6tU8O1fTNi3ifFyd8kGbMQW3kk89Qgth-jn8rtlAs5RtzMaqgT6hbFl2V4efVelWsM2QDV5paHVfJtUVLTBGspA&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;*/*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;cache-control&quot;: &quot;max-age=0&quot;,
+  &quot;content-length&quot;: &quot;120&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=UTF-8&quot;,
+  &quot;cookie&quot;: &quot;__cflb=0H28vSAvT6KU92EMv6Rh56mCL1GHbqGwXsXYz5Hnesv&quot;,
+  &quot;origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-origin&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call2-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf2-call2-reqpayload-content" style="display:none;">{
+  &quot;DOMIdentifiers&quot;: {
+    &quot;rulesType&quot;: 1,
+    &quot;url&quot;: &quot;https://run.resulticks.com/&quot;,
+    &quot;lang&quot;: &quot;en&quot;,
+    &quot;ids&quot;: [
+      &quot;_goober&quot;,
+      &quot;root&quot;
+    ],
+    &quot;classes&quot;: []
+  }
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call2-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf2-call2-response-content" style="display:none;">{
+  &quot;access-control-allow-origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;content-length&quot;: &quot;27757&quot;,
+  &quot;content-type&quot;: &quot;application/octet-stream&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call2-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf2-call2-resppayload-content" style="display:none;">W,u&#39;%8423&quot;%6;64#&gt;89$um
+{u$2;24#8%$um9&quot;;;{u?&gt;32$2;24#8%$umu36#6z63z:69602%z&gt;3
+u{u6?%21	ju?##&#39;$mxx&#39;%1y?9x4;&gt;4&lt;xu
+?%21}jux63%21mu
+w&quot;ggd2w&gt;:0u{u6?%21	ju?##&#39;$mxx   y9&quot;#6&lt;&quot;y92#x$&gt;09&quot;&#39;x;693&gt;90xu
+u{u6?%21	ju?##&#39;$mxx08;&gt;9&lt;$y 8%&lt;xu
+u{u6894;&gt;4&lt;	ju &gt;938 y;846#&gt;89y%2&#39;;642p?##&#39;$mxx%6938:z611&gt;;&gt;6#2y6#&gt;:6-2y48:xu
+u{u6$&gt;326%&gt;6z;652;ju%2#6&gt;;:23&gt;6y48:&#39;;&gt;:29#6%.&#39;89$8%23u
+u{u0&quot;=z63u{u3&gt;!&gt;3}ju4%&gt;&#39;#88#u
+u{u?%21	ju?##&#39;$mxx6&#39;y84#8&#39;&quot;$&#39;8&#39;y48:x4;&gt;4&lt;xu
+w&quot;ggd2w&gt;:0u{u6?%21	ju?##&#39;$mxx&#39;%1y?9x4;&gt;4&lt;xu
+?%21}jux46:%21mu
+w&quot;ggd2w&gt;:0u{u?%21	ju?##&#39;$mxx   y?8$#0y/.-xu
+w&quot;ggd2w&gt;:0u{u6?%21	ju?##&#39;$mxx$y-;&gt;9&lt;#y48:xu
+u{u6?%21	ju?##&#39;$mxx#%64&lt;y6318%:y92#xu
+u{u&gt;3	ju$24#&gt;89z63z56992%u
+u{u6?%21	ju?##&#39;mxx   y1%&gt;293;.3&quot;4&lt;y48:xu
+u{u6?%21	ju?##&#39;$mxx!8;&quot;&quot;:y&#39;%8:z/46:$y48:xu
+u{u$&#39;69&gt;3	ju2-8&gt;4z&#39;&quot;5z63z&#39;;642?8;32%zu
+u{u6?%21	ju?##&#39;$mxx08y/;!&gt;&gt;&gt;%3%y48:u
+u{u#8&#39;635;84&lt;u{u6?%21	ju?##&#39;$mxx08y$#%&#39;=:&#39;y48:xu
+u{u6?%21	ju?##&#39;$mxx63y38&quot;5;24;&gt;4&lt;y92#xu
+u{u6?%21	ju?##&#39;$mxx1&gt;9694263$y92#x#4y&#39;?&#39;hu
+u{u6?%21	ju?##&#39;$mxx=8&gt;9y!&gt;%#&quot;6;#6588y48:x#%64&lt;xu
+u{u3&gt;$&#39;;6.z63$u{u6?%21	ju?##&#39;$mxx#%64&lt;&gt;90y6!6&#39;6%#92%y48:xu
+u{u6?%21}juy$63560&quot;2##2y48:xu
+u{u6?%21	ju?##&#39;$mxx590&#39;#y48:xu
+u{u6?%21	ju?##&#39;$mxx08y98%3!&#39;9y92#x611u
+w&quot;ggd2w&gt;:0u{u6?%21	ju?##&#39;$mxx6y63#90y48:xu
+u{u6?%21	ju?##&#39;mxx$926&lt;.63:&gt;9&gt;$#%6#&gt;89y48:xu
+u{u6?%21	ju?##&#39;$mxx=8&gt;9y569923$2/#6&#39;2$y48:x#%64&lt;xu
+u{u6?%21	ju?##&#39;$mxx:: 25?693;2%y611z89;&gt;92y48:xu
+u{u3&gt;!&gt;3	ju:%24z;2632%586%3zu
+u{u6?%21	ju?##&#39;$mxx6y52$#...</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf2-call3" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://run.resulticks.com/ctYjLZ_sA_LZiXQ2qPEXjmYnBysqvmMl7sbSwuDy7O5Sh8EPVxBJos6rfseOMFol2ANNAb6ceo7lrXAof7EME1w6H0cUm6tk4Qhn39OXvd-sv46ukBYXwCnGZbmYASJWLhV_Al2QVbQWO4AK25ZmJtQVMG89hwOqFDIvhC4Jz2ZDuqtBRroOlu5SQ57ZGCFL3pnk9bEgGrp5UwajfS256SZ9DIuEBgQav4IXVWtCwHsfQ7tw5uWZJBI9vr1ttYyXziUfPaiwCFlYQ3FTk844AUvy6Ap7rdhbIK2dC_WQL3tqMH8u4FJ9j6XS_sOiSic6k6JojBauTLiHqnvunvjDWEyjPb1iGUwR1xb_bGTNokYLEc9h872qD4Pw4cYm6hj90oX70rQJjP57ZyQxP-hg12BhSDvMSTo1nNVWgPmTDtavDDokf2Nbop6Sm_hxg2u6pyuW-koQOMhCYJxxOA</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">5123 ms</span></div><div class="perf-call-body" id="perf2-call3-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call3-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf2-call3-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;run.resulticks.com&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/ctYjLZ_sA_LZiXQ2qPEXjmYnBysqvmMl7sbSwuDy7O5Sh8EPVxBJos6rfseOMFol2ANNAb6ceo7lrXAof7EME1w6H0cUm6tk4Qhn39OXvd-sv46ukBYXwCnGZbmYASJWLhV_Al2QVbQWO4AK25ZmJtQVMG89hwOqFDIvhC4Jz2ZDuqtBRroOlu5SQ57ZGCFL3pnk9bEgGrp5UwajfS256SZ9DIuEBgQav4IXVWtCwHsfQ7tw5uWZJBI9vr1ttYyXziUfPaiwCFlYQ3FTk844AUvy6Ap7rdhbIK2dC_WQL3tqMH8u4FJ9j6XS_sOiSic6k6JojBauTLiHqnvunvjDWEyjPb1iGUwR1xb_bGTNokYLEc9h872qD4Pw4cYm6hj90oX70rQJjP57ZyQxP-hg12BhSDvMSTo1nNVWgPmTDtavDDokf2Nbop6Sm_hxg2u6pyuW-koQOMhCYJxxOA&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;*/*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;content-length&quot;: &quot;0&quot;,
+  &quot;cookie&quot;: &quot;__cflb=0H28vSAvT6KU92EMv6Rh56mCL1GHbqGwXsXYz5Hnesv&quot;,
+  &quot;origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-origin&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call3-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf2-call3-reqpayload-content" style="display:none;">-</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call3-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf2-call3-response-content" style="display:none;">{
+  &quot;access-control-allow-origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;content-length&quot;: &quot;71&quot;,
+  &quot;content-type&quot;: &quot;application/json&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call3-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf2-call3-resppayload-content" style="display:none;">{
+  &quot;status&quot;: &quot;error&quot;,
+  &quot;errorMessage&quot;: &quot;internal error&quot;,
+  &quot;errorCode&quot;: 500
+}</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf2-call4" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://run.resulticks.com/iNIHmXykQQMnArQg9jo-jwZ44yC7XNWVChJVxgYkW_PdXQ7RLKNeTBQVewlr2ICPCsE1jlYkPYG5l9-aRFkeJ3i6dPF1NnCuw0ycDqtMz_n8q03pvACT7cvBaKp5d0SHHafS8fBAXCdP3QuzsNGAAClh2uciQCfSrCXvJCnntLXGOIOde9lZb4EU8-htSRsQZSki4FoR5bT6D2i8jHyEFsgJa6B0L6TcTpjrSXyDAKakDl-2yqGncA7lgGgfDFUO3pr0S0Bj590b9rsDKtDS9ipAQDFSi3zDl7-En_Jp29fnWBQzsydV-wqOGwwDCpDhgi6H1GKQcK-ScBqjD5NbH9zxEa2o_h91FTglWdDWzjRIcB9JDX2GVmslWPd2SwfEY1RTuN81StGHd9IVbRyTgHatRLQbOSacKSahZU2MhVs9GozY9zhaNCwQA1EsptKMF1ECFiEqAKug_9wpnA</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">5162 ms</span></div><div class="perf-call-body" id="perf2-call4-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call4-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf2-call4-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;run.resulticks.com&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/iNIHmXykQQMnArQg9jo-jwZ44yC7XNWVChJVxgYkW_PdXQ7RLKNeTBQVewlr2ICPCsE1jlYkPYG5l9-aRFkeJ3i6dPF1NnCuw0ycDqtMz_n8q03pvACT7cvBaKp5d0SHHafS8fBAXCdP3QuzsNGAAClh2uciQCfSrCXvJCnntLXGOIOde9lZb4EU8-htSRsQZSki4FoR5bT6D2i8jHyEFsgJa6B0L6TcTpjrSXyDAKakDl-2yqGncA7lgGgfDFUO3pr0S0Bj590b9rsDKtDS9ipAQDFSi3zDl7-En_Jp29fnWBQzsydV-wqOGwwDCpDhgi6H1GKQcK-ScBqjD5NbH9zxEa2o_h91FTglWdDWzjRIcB9JDX2GVmslWPd2SwfEY1RTuN81StGHd9IVbRyTgHatRLQbOSacKSahZU2MhVs9GozY9zhaNCwQA1EsptKMF1ECFiEqAKug_9wpnA&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;*/*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;content-length&quot;: &quot;2&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=UTF-8&quot;,
+  &quot;cookie&quot;: &quot;__cflb=0H28vSAvT6KU92EMv6Rh56mCL1GHbqGwXsXYz5Hnesv&quot;,
+  &quot;origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-origin&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call4-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf2-call4-reqpayload-content" style="display:none;">{}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call4-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf2-call4-response-content" style="display:none;">{
+  &quot;access-control-allow-origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;content-length&quot;: &quot;34&quot;,
+  &quot;content-type&quot;: &quot;application/json&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call4-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf2-call4-resppayload-content" style="display:none;">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;result&quot;: 0
+}</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf2-call5" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://run.resulticks.com/y7A9aoZLq_ccy_wCSH_duohUngKzEFGTnuLBaJrUoh1YtyfUdE2u9duh1T02pWr8Bw_-7A3gQkFKlZt0YxeBjBW94gnWSJrEkiyjEp4Ogu4-6NePifQcifxIP3gbhWrZJ8l-iUJbCfjmS2BSlVG190yAHpQfJbe3JhKayLt0wlYqpKzt3lr2ZK1Pkgch4lBtTAS1rW6GicEVyxnuVWDzsweWcM0zJcyABNhCqB4zh6-snTWFsD69mkuXrMW0citnjo2CzWUUYIJDTqnEzwNq1m9guIQCVzuUGirJRFpkEVoEKeKZBV1RLDYCNfMCLQp3IYXiftKNAPQFhNALpx5czG8xaSWK046XW1BkHHib_HzmA2XsJZX8O3S8msT6tU8O1fTNi3ifFyd8kGbMQW3kk89Qgth-jn8rtlAs5RtzMaqgT6hbFl2V4efVelWsM2QDV5paHVfJtUVLTBGspA</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">15422 ms</span></div><div class="perf-call-body" id="perf2-call5-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call5-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf2-call5-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;run.resulticks.com&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/y7A9aoZLq_ccy_wCSH_duohUngKzEFGTnuLBaJrUoh1YtyfUdE2u9duh1T02pWr8Bw_-7A3gQkFKlZt0YxeBjBW94gnWSJrEkiyjEp4Ogu4-6NePifQcifxIP3gbhWrZJ8l-iUJbCfjmS2BSlVG190yAHpQfJbe3JhKayLt0wlYqpKzt3lr2ZK1Pkgch4lBtTAS1rW6GicEVyxnuVWDzsweWcM0zJcyABNhCqB4zh6-snTWFsD69mkuXrMW0citnjo2CzWUUYIJDTqnEzwNq1m9guIQCVzuUGirJRFpkEVoEKeKZBV1RLDYCNfMCLQp3IYXiftKNAPQFhNALpx5czG8xaSWK046XW1BkHHib_HzmA2XsJZX8O3S8msT6tU8O1fTNi3ifFyd8kGbMQW3kk89Qgth-jn8rtlAs5RtzMaqgT6hbFl2V4efVelWsM2QDV5paHVfJtUVLTBGspA&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;*/*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;cache-control&quot;: &quot;max-age=0&quot;,
+  &quot;content-length&quot;: &quot;747&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=UTF-8&quot;,
+  &quot;cookie&quot;: &quot;__cflb=0H28vSAvT6KU92EMv6Rh56mCL1GHbqGwXsXYz5Hnesv&quot;,
+  &quot;origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-origin&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call5-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf2-call5-reqpayload-content" style="display:none;">{
+  &quot;DOMIdentifiers&quot;: {
+    &quot;rulesType&quot;: 2,
+    &quot;url&quot;: &quot;https://run.resulticks.com/&quot;,
+    &quot;lang&quot;: &quot;en&quot;,
+    &quot;ids&quot;: [
+      &quot;loading&quot;,
+      &quot;ecertificate&quot;
+    ],
+    &quot;classes&quot;: [
+      &quot;rs-page-content-wrapper-container&quot;,
+      &quot;login-route-loading&quot;,
+      &quot;rs-page-content-wrapper&quot;,
+      &quot;login-bg-img&quot;,
+      &quot;rsloading&quot;,
+      &quot;rsloading--login-route&quot;,
+      &quot;loading&quot;,
+      &quot;loading-content&quot;,
+      &quot;loading-tick&quot;,
+      &quot;login-content-area&quot;,
+      &quot;login&quot;,
+      &quot;rs-page-footer-wrapper&quot;,
+      &quot;position-relative&quot;,
+      &quot;container&quot;,
+      &quot;copyright&quot;,
+      &quot;list-group&quot;,
+      &quot;list-group-horizontal&quot;,
+      &quot;init-copyright&quot;,
+      &quot;rs-footer-pb-wrapper&quot;,
+      &quot;powered-by&quot;,
+      &quot;rs-tooltip-wrapper&quot;,
+      &quot;res-tooltip-wrapper&quot;,
+      &quot;lh0&quot;,
+      &quot;w-100&quot;,
+      &quot;tooltip-wrap&quot;,
+      &quot;rs-tooltip-child-wrapper&quot;,
+      &quot;res-tooltip-child-wrapper&quot;,
+      &quot;icon-rs-poweredby-medium&quot;,
+      &quot;icon-md&quot;,
+      &quot;position-absolute&quot;,
+      &quot;top-60&quot;,
+      &quot;right0&quot;,
+      &quot;g-0&quot;,
+      &quot;container-fluid&quot;,
+      &quot;footer-borders-container&quot;
+    ]
+  }
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call5-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf2-call5-response-content" style="display:none;">{
+  &quot;access-control-allow-origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;content-length&quot;: &quot;275&quot;,
+  &quot;content-type&quot;: &quot;application/octet-stream&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call5-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf2-call5-resppayload-content" style="display:none;">H3j8:&#39;+-,=:)$)+&lt;!&#39;&amp;;jrdj;-$-+&lt;&#39;:;jr&amp;=$$dj !,-;-$-+&lt;&#39;:;jr&amp;=$$dj+&#39;&#39;#!-;-$-+&lt;&#39;:;jrjf+&#39;&amp;&lt;)!&amp;-:f+&#39;&#39;#!-!&amp;.&#39;jdjf+&#39;&amp;&lt;)!&amp;-:h=xx{-hk+&#39;&#39;#!-e$)?e!&amp;.&#39;e*):jdjf?eyxxf+&#39;&#39;#!-jdjf+&#39;&amp;&lt;)!&amp;-:e.$=!,f+&#39;&#39;#!-e%&#39;,)$jdj+&#39;&#39;#!- !,-;-$-+&lt;&#39;:;jr&amp;=$$dj/-&amp;-:!+ !,-jr.)$;-dj+&#39;&#39;#!-/-&amp;-:!+ !,-jr.)$;-5</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf2-call6" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://run.resulticks.com/y7A9aoZLq_ccy_wCSH_duohUngKzEFGTnuLBaJrUoh1YtyfUdE2u9duh1T02pWr8Bw_-7A3gQkFKlZt0YxeBjBW94gnWSJrEkiyjEp4Ogu4-6NePifQcifxIP3gbhWrZJ8l-iUJbCfjmS2BSlVG190yAHpQfJbe3JhKayLt0wlYqpKzt3lr2ZK1Pkgch4lBtTAS1rW6GicEVyxnuVWDzsweWcM0zJcyABNhCqB4zh6-snTWFsD69mkuXrMW0citnjo2CzWUUYIJDTqnEzwNq1m9guIQCVzuUGirJRFpkEVoEKeKZBV1RLDYCNfMCLQp3IYXiftKNAPQFhNALpx5czG8xaSWK046XW1BkHHib_HzmA2XsJZX8O3S8msT6tU8O1fTNi3ifFyd8kGbMQW3kk89Qgth-jn8rtlAs5RtzMaqgT6hbFl2V4efVelWsM2QDV5paHVfJtUVLTBGspA</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">6 ms</span></div><div class="perf-call-body" id="perf2-call6-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call6-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf2-call6-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;run.resulticks.com&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/y7A9aoZLq_ccy_wCSH_duohUngKzEFGTnuLBaJrUoh1YtyfUdE2u9duh1T02pWr8Bw_-7A3gQkFKlZt0YxeBjBW94gnWSJrEkiyjEp4Ogu4-6NePifQcifxIP3gbhWrZJ8l-iUJbCfjmS2BSlVG190yAHpQfJbe3JhKayLt0wlYqpKzt3lr2ZK1Pkgch4lBtTAS1rW6GicEVyxnuVWDzsweWcM0zJcyABNhCqB4zh6-snTWFsD69mkuXrMW0citnjo2CzWUUYIJDTqnEzwNq1m9guIQCVzuUGirJRFpkEVoEKeKZBV1RLDYCNfMCLQp3IYXiftKNAPQFhNALpx5czG8xaSWK046XW1BkHHib_HzmA2XsJZX8O3S8msT6tU8O1fTNi3ifFyd8kGbMQW3kk89Qgth-jn8rtlAs5RtzMaqgT6hbFl2V4efVelWsM2QDV5paHVfJtUVLTBGspA&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;*/*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;cache-control&quot;: &quot;max-age=0&quot;,
+  &quot;content-length&quot;: &quot;2356&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=UTF-8&quot;,
+  &quot;cookie&quot;: &quot;__cflb=0H28vSAvT6KU92EMv6Rh56mCL1GHbqGwXsXYz5Hnesv&quot;,
+  &quot;origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-origin&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call6-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf2-call6-reqpayload-content" style="display:none;">{&quot;DOMIdentifiers&quot;:{&quot;rulesType&quot;:2,&quot;url&quot;:&quot;https://run.resulticks.com/&quot;,&quot;lang&quot;:&quot;en&quot;,&quot;ids&quot;:[&quot;emailId&quot;,&quot;rs_ExistingUser_password&quot;,&quot;_r_2_&quot;,&quot;rememberme&quot;,&quot;rs_ExistingUser_forgot&quot;,&quot;rs_ExistingUser_signin&quot;,&quot;rs_DisablePluginModal_proceed&quot;],&quot;classes&quot;:[&quot;brand-logo&quot;,&quot;emojifont&quot;,&quot;res-input-field-required&quot;,&quot;active&quot;,&quot;dropdown-item&quot;,&quot;rs-bootstrap-dropdown-menu&quot;,&quot;dropdown-menu&quot;,&quot;login-container&quot;,&quot;rs-homepage-alert-wrapper&quot;,&quot;login-resul-logo&quot;,&quot;mt25&quot;,&quot;login-info-container&quot;,&quot;mx0&quot;,&quot;row&quot;,&quot;tabBlock&quot;,&quot;px0&quot;,&quot;col&quot;,&quot;loginTabs&quot;,&quot;loginTabs-container&quot;,&quot;rs-chart-tab&quot;,&quot;pointer-event-none&quot;,&quot;mini&quot;,&quot;mb0&quot;,&quot;tabDefault&quot;,&quot;single-tab&quot;,&quot;d-block&quot;,&quot;tab-label&quot;,&quot;login-cont&quot;,&quot;login-cont--loadable&quot;,&quot;tabs-content&quot;,&quot;d-flex&quot;,&quot;rs-login-wrapper&quot;,&quot;login-panel&quot;,&quot;form-group&quot;,&quot;col-md-6&quot;,&quot;rs-bootstrap-dropdown&quot;,&quot;rs-bootstrap-dropdown-with-icon&quot;,&quot;login-existing-user-dropdown&quot;,&quot;rs-dropdown&quot;,&quot;1&quot;,&quot;dropdown&quot;,&quot;dropdown-toggle&quot;,&quot;btn&quot;,&quot;css-scrollbar&quot;,&quot;custome-dropdown-scroll&quot;,&quot;v1-dropdown-data&quot;,&quot;res-input-wrapper&quot;,&quot;res-input-placeholder-wrapper&quot;,&quot;res-input-icon-placeholder&quot;,&quot;res-input-field&quot;,&quot;res-input-wrapper-required&quot;,&quot;res-input-label-text&quot;,&quot;res-input-label-required&quot;,&quot;res-input-border-bottom-required&quot;,&quot;res-input-icon-wrapper&quot;,&quot;res-login-email-status-icon&quot;,&quot;res-login-email-status-icon--email&quot;,&quot;res-login-email-status-icon__svg&quot;,&quot;res-login-email-status-icon__email&quot;,&quot;res-login-email-status-icon__email-line&quot;,&quot;res-login-email-status-icon__email-box&quot;,&quot;res-login-email-status-icon__email-flap&quot;,&quot;res-login-email-status-icon__email-fold&quot;,&quot;res-login...</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call6-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf2-call6-response-content" style="display:none;">{
+  &quot;access-control-allow-origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;content-length&quot;: &quot;334&quot;,
+  &quot;content-type&quot;: &quot;application/octet-stream&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call6-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf2-call6-resppayload-content" style="display:none;">-</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf2-call7" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">GET</span><span class="perf-call-url">https://geolocation-db.com/json/</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">1507 ms</span></div><div class="perf-call-body" id="perf2-call7-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call7-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf2-call7-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;geolocation-db.com&quot;,
+  &quot;:method&quot;: &quot;GET&quot;,
+  &quot;:path&quot;: &quot;/json/&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;application/json, text/plain, */*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;cross-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call7-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf2-call7-reqpayload-content" style="display:none;">-</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call7-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf2-call7-response-content" style="display:none;">{
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;content-encoding&quot;: &quot;gzip&quot;,
+  &quot;content-type&quot;: &quot;text/html; charset=UTF-8&quot;,
+  &quot;date&quot;: &quot;Tue, 27 Oct 2026 10:10:18 GMT&quot;,
+  &quot;server&quot;: &quot;nginx/1.14.0 (Ubuntu)&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call7-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf2-call7-resppayload-content" style="display:none;">{
+  &quot;country_code&quot;: &quot;IN&quot;,
+  &quot;country_name&quot;: &quot;India&quot;,
+  &quot;city&quot;: null,
+  &quot;postal&quot;: null,
+  &quot;latitude&quot;: 20,
+  &quot;longitude&quot;: 77,
+  &quot;IPv4&quot;: &quot;116.212.183.147&quot;,
+  &quot;state&quot;: null
+}</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf2-call8" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://run.resulticks.com/iNIHmXykQQMnArQg9jo-jwZ44yC7XNWVChJVxgYkW_PdXQ7RLKNeTBQVewlr2ICPCsE1jlYkPYG5l9-aRFkeJ3i6dPF1NnCuw0ycDqtMz_n8q03pvACT7cvBaKp5d0SHHafS8fBAXCdP3QuzsNGAAClh2uciQCfSrCXvJCnntLXGOIOde9lZb4EU8-htSRsQZSki4FoR5bT6D2i8jHyEFsgJa6B0L6TcTpjrSXyDAKakDl-2yqGncA7lgGgfDFUO3pr0S0Bj590b9rsDKtDS9ipAQDFSi3zDl7-En_Jp29fnWBQzsydV-wqOGwwDCpDhgi6H1GKQcK-ScBqjD5NbH9zxEa2o_h91FTglWdDWzjRIcB9JDX2GVmslWPd2SwfEY1RTuN81StGHd9IVbRyTgHatRLQbOSacKSahZU2MhVs9GozY9zhaNCwQA1EsptKMF1ECFiEqAKug_9wpnA</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 200</span><span class="perf-call-time">4 ms</span></div><div class="perf-call-body" id="perf2-call8-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call8-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf2-call8-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;run.resulticks.com&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/iNIHmXykQQMnArQg9jo-jwZ44yC7XNWVChJVxgYkW_PdXQ7RLKNeTBQVewlr2ICPCsE1jlYkPYG5l9-aRFkeJ3i6dPF1NnCuw0ycDqtMz_n8q03pvACT7cvBaKp5d0SHHafS8fBAXCdP3QuzsNGAAClh2uciQCfSrCXvJCnntLXGOIOde9lZb4EU8-htSRsQZSki4FoR5bT6D2i8jHyEFsgJa6B0L6TcTpjrSXyDAKakDl-2yqGncA7lgGgfDFUO3pr0S0Bj590b9rsDKtDS9ipAQDFSi3zDl7-En_Jp29fnWBQzsydV-wqOGwwDCpDhgi6H1GKQcK-ScBqjD5NbH9zxEa2o_h91FTglWdDWzjRIcB9JDX2GVmslWPd2SwfEY1RTuN81StGHd9IVbRyTgHatRLQbOSacKSahZU2MhVs9GozY9zhaNCwQA1EsptKMF1ECFiEqAKug_9wpnA&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;*/*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;content-length&quot;: &quot;2&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=UTF-8&quot;,
+  &quot;cookie&quot;: &quot;__cflb=0H28vSAvT6KU92EMv6Rh56mCL1GHbqGwXsXYz5Hnesv&quot;,
+  &quot;origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;same-origin&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call8-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf2-call8-reqpayload-content" style="display:none;">{}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call8-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf2-call8-response-content" style="display:none;">{
+  &quot;access-control-allow-origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;content-length&quot;: &quot;34&quot;,
+  &quot;content-type&quot;: &quot;application/json&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call8-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf2-call8-resppayload-content" style="display:none;">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;result&quot;: 0
+}</pre></div></div></div></div><div class="perf-call"><div class="perf-call-header" data-call-id="perf2-call9" data-expanded="false" onclick="toggleApiCallDetails(this, event)"><span class="chevron">&#9654;</span><span class="perf-call-method">POST</span><span class="perf-call-url">https://runwiz.resul.io/AccountSetup/GetIPData</span><span class="perf-call-status" style="color:#28a745; font-weight:600;">✅ 201</span><span class="perf-call-time">2689 ms</span></div><div class="perf-call-body" id="perf2-call9-details" style="display:none;"><div class="perf-tabs"><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call9-reqheader" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Header</div><pre class="api-body-pre perf-tab-content" id="perf2-call9-reqheader-content" style="display:none;">{
+  &quot;:authority&quot;: &quot;runwiz.resul.io&quot;,
+  &quot;:method&quot;: &quot;POST&quot;,
+  &quot;:path&quot;: &quot;/AccountSetup/GetIPData&quot;,
+  &quot;:scheme&quot;: &quot;https&quot;,
+  &quot;accept&quot;: &quot;application/json, text/plain, */*&quot;,
+  &quot;accept-encoding&quot;: &quot;gzip, deflate, br, zstd&quot;,
+  &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;,
+  &quot;authorization&quot;: &quot;Bearer null&quot;,
+  &quot;content-length&quot;: &quot;31&quot;,
+  &quot;content-type&quot;: &quot;application/json&quot;,
+  &quot;origin&quot;: &quot;https://run.resulticks.com&quot;,
+  &quot;priority&quot;: &quot;u=1, i&quot;,
+  &quot;referer&quot;: &quot;https://run.resulticks.com/&quot;,
+  &quot;reqs&quot;: &quot;null&quot;,
+  &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;147\&quot;, \&quot;Not.A/Brand\&quot;;v=\&quot;8\&quot;&quot;,
+  &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;,
+  &quot;sec-ch-ua-platform&quot;: &quot;\&quot;Windows\&quot;&quot;,
+  &quot;sec-fetch-dest&quot;: &quot;empty&quot;,
+  &quot;sec-fetch-mode&quot;: &quot;cors&quot;,
+  &quot;sec-fetch-site&quot;: &quot;cross-site&quot;,
+  &quot;user-agent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36&quot;,
+  &quot;x-forwarded-for&quot;: &quot;null&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call9-reqpayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Request Payload</div><pre class="api-body-pre perf-tab-content" id="perf2-call9-reqpayload-content" style="display:none;">{
+  &quot;ipaddress&quot;: &quot;116.212.183.147&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call9-response" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Header</div><pre class="api-body-pre perf-tab-content" id="perf2-call9-response-content" style="display:none;">{
+  &quot;access-control-allow-credentials&quot;: &quot;true&quot;,
+  &quot;access-control-allow-origin&quot;: &quot;*&quot;,
+  &quot;content-encoding&quot;: &quot;br&quot;,
+  &quot;content-type&quot;: &quot;application/json; charset=utf-8&quot;,
+  &quot;date&quot;: &quot;Tue, 27 Oct 2026 10:10:20 GMT&quot;,
+  &quot;server&quot;: &quot;Kestrel&quot;,
+  &quot;strict-transport-security&quot;: &quot;max-age=31536000; includeSubDomains&quot;,
+  &quot;vary&quot;: &quot;Accept-Encoding,Origin,Origin&quot;,
+  &quot;via&quot;: &quot;1.1 google&quot;,
+  &quot;x-content-type-options&quot;: &quot;nosniff&quot;,
+  &quot;x-frame-options&quot;: &quot;SAMEORIGIN&quot;,
+  &quot;x-xss-protection&quot;: &quot;1; mode=block&quot;
+}</pre></div><div class="perf-tab-item"><div class="perf-tab-label" data-tab-id="perf2-call9-resppayload" onclick="togglePerfTab(this, event)"><span class="chevron">&#9654;</span> Response Payload</div><pre class="api-body-pre perf-tab-content" id="perf2-call9-resppayload-content" style="display:none;">{
+  &quot;status&quot;: true,
+  &quot;message&quot;: &quot;Successfull&quot;,
+  &quot;data&quot;: {
+    &quot;latitude&quot;: &quot;13.0895&quot;,
+    &quot;longitude&quot;: &quot;80.2739&quot;,
+    &quot;country&quot;: &quot;India&quot;,
+    &quot;countryCode&quot;: &quot;IN&quot;,
+    &quot;city&quot;: &quot;Chennai&quot;,
+    &quot;location&quot;: &quot;TN&quot;,
+    &quot;istCode&quot;: &quot;91&quot;,
+    &quot;countryID&quot;: 3,
+    &quot;currencyID&quot;: 1,
+    &quot;defaultLanguageID&quot;: 1,
+    &quot;defaultDateformatID&quot;: 2,
+    &quot;defaultTimeFormatID&quot;: 0,
+    &quot;defaultTimeZoneID&quot;: 64
+  }
+}</pre></div></div></div></div></div></div></div></div>
+<script>
+function togglePerfDetails(header) {
+    var detailsRow = document.getElementById(header.getAttribute('data-perf-id') + '-details');
+    if (!detailsRow) return;
+    var expandIcon = header.querySelector('.chevron');
+    if (detailsRow.style.display === 'none') {
+        detailsRow.style.display = 'block';
+        header.setAttribute('data-expanded', 'true');
+        if (expandIcon) { expandIcon.innerHTML = '&#9660;'; }
+    } else {
+        detailsRow.style.display = 'none';
+        header.setAttribute('data-expanded', 'false');
+        if (expandIcon) { expandIcon.innerHTML = '&#9654;'; }
+    }
+}
+function toggleApiCallDetails(header, event) {
+    if (event) event.stopPropagation();
+    var detailsRow = document.getElementById(header.getAttribute('data-call-id') + '-details');
+    if (!detailsRow) return;
+    var expandIcon = header.querySelector('.chevron');
+    if (detailsRow.style.display === 'none') {
+        detailsRow.style.display = 'block';
+        header.setAttribute('data-expanded', 'true');
+        if (expandIcon) { expandIcon.innerHTML = '&#9660;'; }
+    } else {
+        detailsRow.style.display = 'none';
+        header.setAttribute('data-expanded', 'false');
+        if (expandIcon) { expandIcon.innerHTML = '&#9654;'; }
+    }
+}
+function togglePerfTab(label, event) {
+    if (event) event.stopPropagation();
+    var content = document.getElementById(label.getAttribute('data-tab-id') + '-content');
+    if (!content) return;
+    var expandIcon = label.querySelector('.chevron');
+    if (content.style.display === 'none') {
+        content.style.display = 'block';
+        if (expandIcon) { expandIcon.innerHTML = '&#9660;'; }
+    } else {
+        content.style.display = 'none';
+        if (expandIcon) { expandIcon.innerHTML = '&#9654;'; }
+    }
+}
+document.addEventListener('DOMContentLoaded', function() {
+    var searchInput = document.getElementById('perfSearchInput');
+    if (!searchInput) return;
+    searchInput.addEventListener('input', function() {
+        var searchText = searchInput.value.toLowerCase().trim();
+        var cards = document.querySelectorAll('#perfList > .perf-card');
+        cards.forEach(function(card) {
+            var cardText = (card.getAttribute('data-search-text') || '').toLowerCase();
+            card.style.display = (!searchText || cardText.includes(searchText)) ? '' : 'none';
+        });
+    });
+});
+</script>
+        
+</div>
+
+<!-- ===== Lightbox Modal ===== -->
+<div class="modal" id="lightboxModal">
+    <span id="closeModal">&#x2716;</span>
+    <img class="modal-content" id="lightboxImage" style="display:none;"/>
+    <video class="modal-content" id="lightboxVideo" controls style="display:none;"></video>
+</div>
+
+<!-- Floating tooltip for the Last 7 circles (body-level so it isn't clipped by table overflow) -->
+<div id="miniTooltip"></div>
+
+<script>
+/* ===== Navigation ===== */
+function showDetailedReport(moduleFilter) {
+    document.getElementById("summary-section").style.display = "none";
+    document.getElementById("performance-section").style.display = "none";
+    document.getElementById("detailed-section").style.display = "block";
+    window.scrollTo(0, 0);
+
+    // Apply module filter if provided, otherwise show all rows
+    var mainRows = document.querySelectorAll('#testcaseTable > tbody > tr:not(.details-row)');
+    mainRows.forEach(function(row) {
+        var rowModule = (row.getAttribute('data-module') || '').toUpperCase().trim();
+        var filterModule = moduleFilter ? moduleFilter.toUpperCase().trim() : '';
+        var shouldShow = !filterModule || rowModule === filterModule;
+        var testId = row.getAttribute('data-test-id');
+        var detailsRow = document.getElementById(testId + '-details');
+        if (shouldShow) {
+            row.style.display = '';
+            if (detailsRow) {
+                var expanded = row.getAttribute('data-expanded') === 'true';
+                detailsRow.style.display = expanded ? 'table-row' : 'none';
+            }
+        } else {
+            row.style.display = 'none';
+            if (detailsRow) detailsRow.style.display = 'none';
+        }
+    });
+
+    // Reset the search/filter controls to reflect no active text/status filter
+    var searchInput = document.getElementById('searchInput');
+    var statusFilter = document.getElementById('statusFilter');
+    if (searchInput) searchInput.value = '';
+    if (statusFilter) statusFilter.value = '';
+}
+function showSummaryReport() {
+    document.getElementById("detailed-section").style.display = "none";
+    document.getElementById("performance-section").style.display = "none";
+    document.getElementById("summary-section").style.display = "block";
+    window.scrollTo(0, 0);
+}
+function showPerformanceReport() {
+    document.getElementById("summary-section").style.display = "none";
+    document.getElementById("detailed-section").style.display = "none";
+    document.getElementById("performance-section").style.display = "block";
+    window.scrollTo(0, 0);
+}
+
+/* ===== Doughnut Chart ===== */
+document.addEventListener('DOMContentLoaded', function() {
+    var ctx = document.getElementById('chart1');
+    if (ctx) {
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Passed', 'Failed', 'Skipped'],
+                datasets: [{
+                    data: [0, 2, 0],
+                    backgroundColor: ['#28a745', '#dc3545', '#ffc107']
+                }]
+            },
+            options: { plugins: { legend: { position: 'bottom' } } }
+        });
+    }
+    showSummaryReport();
+    populateModuleTable();
+});
+
+/* ===== Module Table ===== */
+var moduleDataRaw = "[{\"module\": \"AUDIENCE\", \"total\": 2, \"passed\": 0, \"failed\": 2, \"skipped\": 0, \"durationMillis\": 290557}]";
+var moduleData = [];
+try { moduleData = JSON.parse(moduleDataRaw); } catch (e) { console.error('Failed to parse module data:', e); }
+
+function formatDuration(ms) {
+    if (!ms || ms <= 0) return '-';
+    var totalSeconds = Math.floor(ms / 1000);
+    var hours = Math.floor(totalSeconds / 3600);
+    var minutes = Math.floor((totalSeconds % 3600) / 60);
+    var seconds = totalSeconds % 60;
+    var pad = function(n) { return n.toString().padStart(2, '0'); };
+    return pad(hours) + ':' + pad(minutes) + ':' + pad(seconds);
+}
+
+function populateModuleTable() {
+    var tableBody = document.getElementById('moduleTableBody');
+    if (!tableBody) return;
+
+    if (!moduleData || moduleData.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#666;">No module data available</td></tr>';
+        return;
+    }
+
+    tableBody.innerHTML = moduleData.map(function(m) {
+        var successRate = m.total > 0 ? ((m.passed / m.total) * 100).toFixed(0) : '0';
+        var slaRate = 90;
+        var modName = (m.module || 'Unknown Module');
+        return '<tr class="module-summary-row" data-filter-module="' + modName + '" style="cursor:pointer;">'
+            + '<td>' + modName + '</td>'
+            + '<td>' + (m.total || 0) + '</td>'
+            + '<td>' + (m.passed || 0) + '</td>'
+            + '<td>' + (m.failed || 0) + '</td>'
+            + '<td>' + (m.skipped || 0) + '</td>'
+            + '<td>' + formatDuration(m.durationMillis || 0) + '</td>'
+            + '<td class="' + (slaRate >= 90 ? 'sla-pass' : 'sla-fail') + '">' + slaRate + '%</td>'
+            + '<td class="' + (successRate >= slaRate ? 'sla-pass' : 'sla-fail') + '">' + successRate + '%</td>'
+            + '</tr>';
+    }).join('');
+
+    // Attach click handlers after rows are in the DOM (avoids all inline-JS quoting issues)
+    document.querySelectorAll('.module-summary-row').forEach(function(row) {
+        row.addEventListener('click', function() {
+            showDetailedReport(this.getAttribute('data-filter-module'));
+        });
+    });
+}
+
+/* ===== Floating tooltip for Last 7 circles =====
+   Lives at body level so it is never clipped by .table-container's overflow.
+   Uses document-level event delegation so it works for dynamically rendered rows. */
+(function() {
+    var tip = document.getElementById('miniTooltip');
+    if (!tip) return;
+
+    function positionTip(target) {
+        var rect = target.getBoundingClientRect();
+        var tipRect = tip.getBoundingClientRect();
+        var left = rect.left + (rect.width / 2) - (tipRect.width / 2);
+        var top = rect.top - tipRect.height - 10;
+        var margin = 6;
+        if (left < margin) left = margin;
+        if (left + tipRect.width > window.innerWidth - margin) {
+            left = window.innerWidth - tipRect.width - margin;
+        }
+        if (top < margin) {
+            // not enough room above — show below
+            top = rect.bottom + 10;
+        }
+        tip.style.left = left + 'px';
+        tip.style.top = top + 'px';
+    }
+
+    document.addEventListener('mouseover', function(e) {
+        // Use closest() rather than checking e.target directly: the mini-circle
+        // icons are now inline SVGs, so hovering the tick/cross/skip graphic
+        // makes e.target the inner <svg>/<path>/<circle>/<line>, not the
+        // .mini-circle span itself. closest() walks up to find the real
+        // tooltip-bearing element regardless of which inner node was hovered.
+        var el = e.target && e.target.closest ? e.target.closest('.mini-circle, .desc-chip-tip') : null;
+        if (!el) return;
+        var text = el.getAttribute('data-tooltip');
+        if (!text) return;
+        tip.textContent = text;
+        tip.style.left = '-9999px';
+        tip.style.top = '-9999px';
+        tip.classList.add('show');
+        requestAnimationFrame(function() { positionTip(el); });
+    });
+
+    document.addEventListener('mouseout', function(e) {
+        var el = e.target && e.target.closest ? e.target.closest('.mini-circle, .desc-chip-tip') : null;
+        if (!el) return;
+        // Don't hide the tooltip if the mouse simply moved to another child
+        // node still inside the same tooltip-bearing element (e.g. from the
+        // <svg> to an inner <path>).
+        var related = e.relatedTarget;
+        if (related && el.contains(related)) return;
+        tip.classList.remove('show');
+    });
+
+    window.addEventListener('scroll', function() {
+        tip.classList.remove('show');
+    }, true);
+})();
+
+/* ===== Lightbox (screenshot + video) ===== */
+document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('screenshot')) {
+        var modal = document.getElementById('lightboxModal');
+        var modalImg = document.getElementById('lightboxImage');
+        var modalVideo = document.getElementById('lightboxVideo');
+        if (modal && modalImg && modalVideo) {
+            modalVideo.style.display = 'none';
+            modalVideo.pause();
+            modalVideo.src = '';
+            modalImg.src = e.target.src;
+            modalImg.style.display = 'block';
+            modal.style.display = 'block';
+        }
+    }
+    if (e.target.id === 'closeModal' || e.target.classList.contains('modal')) {
+        var modal = document.getElementById('lightboxModal');
+        var modalVideo = document.getElementById('lightboxVideo');
+        if (modalVideo) { modalVideo.pause(); modalVideo.src = ''; }
+        if (modal) { modal.style.display = 'none'; }
+    }
+});
+</script>
+</body>
+</html>
